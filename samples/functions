@@ -1,0 +1,11 @@
+mozzarella = (moo) ->
+    moo()
+
+muzzarella = (moo) -> moo
+    moo
+
+mazzarella = ->
+    lollipops
+
+mossarella = -> lollipops
+    lollipops

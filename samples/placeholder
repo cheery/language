@@ -1,0 +1,11 @@
+# parses correctly if placeholders work
+test hello;
+    a
+    b
+
+test.;
+    hehe
+    hoho
+
+test(1, ;)
+    icicle
