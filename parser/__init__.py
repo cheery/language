@@ -107,7 +107,7 @@ def parse_word(tla, required, precedence):
     if expr is None:
         return
     if ahead(tla, 'comma'):
-        expr = Struct(location, 'tuple', expr)
+        expr = Struct(location, 'tuple+', expr)
         while ahead(tla, 'comma'):
             expect(tla, 'comma')
             expr.append(parse_slot(tla, True, precedence))
