@@ -10,7 +10,7 @@ operators = set([
     'or', 'and', 'not',
     '!', ':', '=', '-', '+', '*', '/', '<>', '==', '!=', '->',
     '<', '<=', '>', '>=', '|', '^', '&', '<<', '>>', '//', '%', '~',
-    '.', '.;', '.:', ':.', ';', '@', '::', '..'
+    '.', '.;', '.:', ':.', ';', '@', '::', '..', ':=',
 ])
 
 infix_operators = {
@@ -65,7 +65,7 @@ def parse_sentence(tla, required=True):
     head = parse_word(tla, required, 10)
     if head is None:
         return
-    if ahead_string(tla, '=', ':'):
+    if ahead_string(tla, '=', ':', ':='):
         operator = Constant(tla.location, 'operator', expect(tla, 'operator').string)
         blocks = find_placeholders(head)
         if len(blocks) > 0:
