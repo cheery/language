@@ -1,58 +1,85 @@
 #!/usr/bin/env python2.7
 import argparse
 import parser
-import runtime
+#import runtime
+import proxy
 
 def main():
     argparser = argparse.ArgumentParser(description="Compile file to bytecode")
     argparser.add_argument('filename', type=str, help="File to compile")
     args = argparser.parse_args()
 
-    builder = Build({}, Function())
-    for sentence in parser.parse_file(args.filename):
-        compile_sentence_toplevel(builder, sentence)
-    builder.ret(None)
-
-    function = builder.function
+    const = {}
+    function = compile_function(const, [], parser.parse_file(args.filename))
 
     gktable = function.nonlocals.values()
-    gktable.extend(builder.values.values())
+    gktable.extend(const.values())
+    gk = list()
+    #gk = (runtime.Value*len(gktable))()
+    for i, item in enumerate(gktable):
+        if isinstance(item, Value):
+            if isinstance(item.value, (unicode, str)):
+                s = item.value.encode('utf-8')
+                gk.append( proxy.box_cstring(s) )
+            elif isinstance(item.value, (int, long, float)):
+                gk.append( proxy.box_double(item.value) )
+            else:
+                raise Exception("um? %r" % item.value)
+        else:
+            gk.append( proxy.get_global(item.name) )
 
+    #print gktable
+    descriptor = compile_closure(function, gktable, gk, [])
+    proxy.run_toplevel(descriptor)
+    #cl = runtime.newClosure(cld, None)
+    #runtime.callClosure(cl, 0, None)
+    # argc, upvalc, [uctable], [gktable], [ftable]
+
+def compile_closure(function, gktable, gk, uvtable):
+    uctable = []
     vtable = function.argvar
-    for variable in function.variables.values():
-        if variable not in vtable:
-            vtable.append(variable)
-
-    env = [vtable, [], gktable, len(vtable)]
-
-    tmp_regs = env[3]
+    utable = []
+    ftable = function.functions
     asm = Assembler()
+    for nl in function.nonlocals.values():
+        if nl.value not in gktable:
+            uctable.append(uvtable.index(nl.value))
+#                    runtime.boxFixnum(uvtable.index(nl.value)))
+            utable.append(nl.value)
+    #assert len(uctable) == 0
+    #print "UC", uctable, utable
+    for variable in function.variables.values():
+        if variable.upvalue:
+            utable.append(variable)
+            if variable in vtable:
+                asm.append( proxy.bcode("setupval", utable.index(variable), vtable.index(variable)) )
+                #        runtime.abc("SETUPVAL", utable.index(variable), vtable.index(variable)) )
+        elif variable not in vtable:
+            vtable.append(variable)
+    env = [vtable, utable, gktable, ftable, len(vtable)]
+    tmp_regs = env[4]
     for block in function.blocks:
         asm.label(block)
         for stmt in block.statements:
             to_bytecode(asm, stmt, tmp_regs, env)
     asm.link()
 
-    bytecode = ''.join(asm.code)
-    vt = (runtime.Value*env[3])()
-    gk = (runtime.Value*len(gktable))()
-    for i, item in enumerate(gktable):
-        if isinstance(item, Value):
-            if isinstance(item.value, (unicode, str)):
-                s = item.value.encode('utf-8')
-                gk[i] = runtime.boxString(len(s), s)
-            elif isinstance(item.value, (int, long)):
-                gk[i] = runtime.boxFixnum(item.value)
-            else:
-                raise Exception("um? %r" % item.value)
-        else:
-            gk[i] = runtime.sysfuncs[item.name]
+    ftab = []
+    for func in ftable:
+        ftab.append(proxy.box_object(compile_closure(func, gktable, gk, utable)))
 
-    print env
-    print repr(bytecode)
-    print 'trying to interpret'
-    runtime.rti.interpret(bytecode, vt, gk, None)
-    print 'done'
+    #print "new closures", ftab, vtable
+    bytecode = ''.join(asm.code)
+    return proxy.build_descriptor(len(function.argvar), env[4], len(utable), uctable, bytecode, ftab, gk)
+    #return runtime.buildClosureDef(env[4], len(function.argvar), len(utable), uctable, gk, ftab, bytecode)
+
+#    vt = (runtime.Value*env[4])()
+#
+#    print env
+#    print repr(bytecode)
+#    print 'trying to interpret'
+#    runtime.rti.interpret(bytecode, vt, gk, None)
+#    print 'done'
 
 binops = {
     '+': "add", '-': "sub", '*': "mul", '/': "div",
@@ -62,42 +89,52 @@ binops = {
 }
 
 def to_bytecode(asm, stmt, dreg, env):
-    vtable, utable, gktable, breg = env
-    env[3] = max(breg, dreg+1)
+    vtable, utable, gktable, ftable, breg = env
+    env[4] = max(breg, dreg+1)
     if isinstance(stmt, NonLocal):
         p = stmt.value
         if p in gktable:
-            return asm.append(runtime.ad('LOADGK', dreg, gktable.index(p)))
+            return asm.append(proxy.bcode('getconst', dreg, gktable.index(p)))
+        else:
+            return asm.append(proxy.bcode('getupval', dreg, utable.index(p)))
     elif isinstance(stmt, Value):
-        return asm.append(runtime.ad('LOADGK', dreg, gktable.index(stmt)))
+        return asm.append(proxy.bcode('getconst', dreg, gktable.index(stmt)))
     elif isinstance(stmt, Move):
         to_bytecode(asm, stmt.src, dreg, env)
-        return asm.append(runtime.abc('MOVE', vtable.index(stmt.dst), dreg))
+        if stmt.dst in vtable:
+            return asm.append(proxy.bcode('move', vtable.index(stmt.dst), dreg))
+        else:
+            return asm.append(proxy.bcode('setupval', utable.index(stmt.dst), dreg))
     elif isinstance(stmt, Variable):
-        return asm.append(runtime.abc('MOVE', dreg, vtable.index(stmt)))
+        if stmt in vtable:
+            return asm.append(proxy.bcode('move', dreg, vtable.index(stmt)))
+        else:
+            return asm.append(proxy.bcode('getupval', dreg, utable.index(stmt)))
     elif isinstance(stmt, Test):
         to_bytecode(asm, stmt.cond, dreg, env)
         if stmt.inverse:
-            return asm.append(runtime.ad('TESTN', dreg), link=stmt.then)
+            return asm.append(proxy.bcode('testn', dreg, 0), link=stmt.then)
         else:
-            return asm.append(runtime.ad('TEST',  dreg), link=stmt.then)
+            return asm.append(proxy.bcode('test',  dreg, 0), link=stmt.then)
     elif isinstance(stmt, Jump):
-        return asm.append(runtime.ad('JUMP'), link=stmt.then)
+        return asm.append(proxy.bcode('jump', 0, 0), link=stmt.then)
     elif isinstance(stmt, Return):
         to_bytecode(asm, stmt.value, dreg, env)
-        return asm.append(runtime.abc('RETURN', dreg, 1))
+        return asm.append(proxy.bcode('return', dreg, 1))
+    elif isinstance(stmt, Function):
+        return asm.append(proxy.bcode('closure', dreg, ftable.index(stmt)))
     elif stmt is True:
-        return asm.append(runtime.ad('LOADTRUE', dreg))
+        return asm.append(proxy.bcode('loadbool', dreg, 1))
     elif stmt is False:
-        return asm.append(runtime.ad('LOADFALSE', dreg))
+        return asm.append(proxy.bcode('loadbool', dreg, 0))
     elif stmt is None:
-        return asm.append(runtime.ad('LOADNULL', dreg, 1))
+        return asm.append(proxy.bcode('loadnull', dreg, 1))
     elif stmt.name == 'loop':
-        return asm.append(runtime.ad('LOOP'))
+        return asm.append(proxy.bcode('loop'))
     elif stmt.name == 'call':
         for i, expr in enumerate(stmt.args):
             to_bytecode(asm, expr, dreg+i, env)
-        return asm.append(runtime.abc('call', dreg, dreg, len(stmt.args)))
+        return asm.append(proxy.bcode('call', dreg, dreg+len(stmt.args)))
     elif stmt.name in binops:
         name = binops[stmt.name]
         i = 0
@@ -109,7 +146,7 @@ def to_bytecode(asm, stmt, dreg, env):
                 to_bytecode(asm, arg, dreg+i, env)
                 args.append(dreg+i)
                 i+=1
-        return asm.append(runtime.abc(name, dreg, *args))
+        return asm.append(proxy.bcode(name, dreg, *args))
 
     raise Exception("cannot compile %r" % stmt)
 
@@ -131,7 +168,7 @@ class Assembler(object):
     def link(self):
         for loc, target in self.links:
             to = self.labels[target]
-            self.code[loc] = runtime.rewrite_d(self.code[loc], ((to - loc - 1) * 4) + 0x8000)
+            self.code[loc] = proxy.bcode_adjust(self.code[loc], ((to - loc - 1) * 4) + 0x8000)
 
 def compile_sentence_toplevel(builder, snt):
     if snt.group == 'infix' and snt[0].value == '=' and snt[1].group == 'symbol':
@@ -188,6 +225,9 @@ def compile_sentence_toplevel(builder, snt):
         builder.goto(builder.loops[-1][0], None)
     if len(builder.loops) > 0 and symbole(snt[0], 'break'):
         builder.goto(builder.loops[-1][1], None)
+    if symbole(snt[0], 'return'):
+        builder.ret(compile_expression(builder, snt[1]))
+        return
     builder.append(compile_sentence(builder, snt))
 
 def compile_sentence(builder, snt):
@@ -216,6 +256,8 @@ def compile_expression(builder, expr):
         return builder.const(expr.value)
     if expr.group == 'number':
         return builder.const(int(expr.value))
+    if expr.group == 'float':
+        return builder.const(float(expr.value))
     if expr.group == 'call':
         args = [compile_expression(builder, e) for e in expr]
         return Operation('call', args)
@@ -224,7 +266,29 @@ def compile_expression(builder, expr):
         lhs = compile_expression(builder, lhs)
         rhs = compile_expression(builder, rhs)
         return Operation(op.value, [lhs, rhs])
+    if expr.group == 'function':
+        args = []
+        for symbol in expr[:-1]:
+            assert symbol.group == 'symbol'
+            args.append(symbol.value)
+        func = compile_function(builder.values, args, expr[-1])
+        builder.function.functions.append(func)
+        return func
     raise Exception("%s: cannot compile %r" % (parser.linecol(expr.location), expr))
+
+
+def compile_function(const, args, body):
+    builder = Build(const, Function())
+    for name in args:
+        builder.function.argvar.append( builder.function.get(name) )
+    for sentence in body:
+        compile_sentence_toplevel(builder, sentence)
+    builder.ret(None)
+    for func in builder.function.functions:
+        for nl in func.nonlocals.values():
+            nl.link = v = builder.function.lookup(nl.name)
+            v.upvalue = True
+    return builder.function
 
 def groupe(node, group):
     return node.group == group
@@ -356,6 +420,7 @@ class Variable(object):
     def __init__(self, function, name):
         self.function = function
         self.name = name
+        self.upvalue = False
 
     def __repr__(self):
         return self.name
@@ -364,6 +429,7 @@ class NonLocal(object):
     def __init__(self, name):
         self.name = name
         self.link = None
+        self.upvalue = False
 
     @property
     def value(self):
