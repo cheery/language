@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include "value.h"
+#include "api.h"
 
 #define NAN_MASK  0xFFF8000000000000L
 #define DATA_MASK 0x0000FFFFFFFFFFFFL
@@ -80,7 +80,7 @@ vm_value vm_box_string(size_t length, const char* string)
 {
     vm_string* data;
 
-    data = malloc(sizeof(vm_string) + length + 1);
+    data = realloc(NULL, sizeof(vm_string) + length + 1);
     data->length = length;
     memcpy(data->string, string, length);
     data->string[length] = 0;
@@ -104,7 +104,7 @@ vm_value   vm_box_apifunc(vm_apifunc func)
 
 vm_apifunc vm_unbox_apifunc(vm_value func)
 {
-    return UNTAG(func);
+    return (vm_apifunc)UNTAG(func);
 }
 
 /*

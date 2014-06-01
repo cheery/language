@@ -18,8 +18,6 @@ int vm_cmp(vm_value a, vm_value b)
     tag_b = vm_unbox_tag(b);
     if (tag_a == tag_b) switch (tag_a)
     {
-        case vm_tag_object:
-            break;
         case vm_tag_string:
             len_a = vm_string_length(a);
             len_b = vm_string_length(b);
@@ -65,7 +63,7 @@ int vm_cmp(vm_value a, vm_value b)
             {
                 return 0;
             }
-        case vm_tag_constant:
+        default:
             break;
     }
 

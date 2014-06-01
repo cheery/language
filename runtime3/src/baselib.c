@@ -76,8 +76,25 @@ static void input(vm_context* ctx)
     vm_return_value(ctx, retval);
 }
 
-vm_lib vm_base_library[] = {
+static void make_list(vm_context* ctx)
+{
+    vm_return_value(ctx, vm_new_list());
+}
+
+static vm_lib vm_base_library[] = {
     {"print", print},
     {"input", input},
+    {"list", make_list},
     {NULL, NULL}
 };
+
+vm_value vm_load_baselib()
+{
+    vm_value lib;
+
+    lib = vm_new_api(vm_base_library);
+    //vm_api_register(lib, "list", vm_typespec_interface(&vm_list_type));
+    //vm_api_register(lib, "dict", vm_typespec_interface(&vm_dict_type));
+
+    return lib;
+}

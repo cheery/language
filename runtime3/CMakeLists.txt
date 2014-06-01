@@ -15,6 +15,7 @@ SET(AMBROSIA_SRC
     src/cmp.c
     src/dict.c
     src/list.c
+    src/type.c
     src/value.c
     src/vm.c
 )

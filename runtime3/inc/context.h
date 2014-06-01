@@ -28,6 +28,7 @@ typedef struct
     uint8_t*  pc;
     vm_value* base;
     vm_value* top;
+    vm_value  self;
 } vm_frame;
 
 struct vm_context
@@ -35,6 +36,7 @@ struct vm_context
     int frame;
     vm_value* cbase;
     vm_value* ctop;
+    vm_value  cself;
     vm_value  stack[4096];
     vm_frame frames[1024];
 };

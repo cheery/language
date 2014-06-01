@@ -135,6 +135,21 @@ def to_bytecode(asm, stmt, dreg, env):
         for i, expr in enumerate(stmt.args):
             to_bytecode(asm, expr, dreg+i, env)
         return asm.append(proxy.bcode('call', dreg, dreg+len(stmt.args)))
+    elif stmt.name == 'getattr':
+        to_bytecode(asm, stmt.args[0], dreg+0, env)
+        to_bytecode(asm, stmt.args[1], dreg+1, env)
+        return asm.append(proxy.bcode('getattr', dreg))
+    elif stmt.name == 'callattr':
+        argc = len(stmt.args) - 1
+        to_bytecode(asm, stmt.args[0], dreg+argc, env)
+        for i, expr in enumerate(stmt.args[1:]):
+            to_bytecode(asm, expr, dreg+i, env)
+        return asm.append(proxy.bcode('callattr', dreg+argc, dreg, dreg+argc))
+    elif stmt.name == 'setattr':
+        to_bytecode(asm, stmt.args[0], dreg+0, env)
+        to_bytecode(asm, stmt.args[1], dreg+1, env)
+        to_bytecode(asm, stmt.args[2], dreg+2, env)
+        return asm.append(proxy.bcode('setattr', dreg))
     elif stmt.name in binops:
         name = binops[stmt.name]
         i = 0
@@ -175,6 +190,12 @@ def compile_sentence_toplevel(builder, snt):
         variable = builder.function.get(snt[1].value)
         builder.append(Move(variable, compile_sentence(builder, snt[2])))
         return
+    if snt.group == 'infix' and snt[0].value == '=' and snt[1].group == 'attribute':
+        subject = compile_expression(builder, snt[1][0])
+        attr    = builder.const(snt[1][1].value)
+        builder.append(Operation('setattr', [subject, attr, compile_sentence(builder, snt[2])]))
+        return
+
     assert groupe(snt, 'sentence') and len(snt) > 0
     if symbole(snt[0], 'if') and snt[2].group == 'block':
         cond = compile_expression(builder, snt[1])
@@ -235,12 +256,21 @@ def compile_sentence(builder, snt):
         return compile_expression(builder, snt[0])
     if len(snt) == 2:
         callee, args = snt
-        callee = compile_expression(builder, callee)
+        if callee.group == 'attribute':
+            opname = 'callattr'
+            if callee[1].group == 'attribute':
+                 subject = compile_expression(builder, callee[0])
+                 attr    = builder.const(callee[1].value)
+                 prefix = [subject, attr]
+        else:
+            callee = compile_expression(builder, callee)
+            prefix = [callee]
+            opname = 'call'
         if groupe(args, 'tuple+'):
             args = [compile_expression(builder, expr) for expr in args]
         else:
             args = [compile_expression(builder, args)]
-        return Operation('call', [callee] + args)
+        return Operation(opname, prefix + args)
     raise Exception("%s: cannot compile %r" % (parser.linecol(snt.location), snt))
 
 def compile_expression(builder, expr):
@@ -259,6 +289,8 @@ def compile_expression(builder, expr):
     if expr.group == 'float':
         return builder.const(float(expr.value))
     if expr.group == 'call':
+        if expr[0].group == 'attribute':
+            raise Exception("Blah" + repr(expr))
         args = [compile_expression(builder, e) for e in expr]
         return Operation('call', args)
     if expr.group == 'infix':
@@ -274,6 +306,10 @@ def compile_expression(builder, expr):
         func = compile_function(builder.values, args, expr[-1])
         builder.function.functions.append(func)
         return func
+    if expr.group == 'attribute' and expr[1].group == 'attribute':
+        subject, name = expr
+        subject = compile_expression(builder, subject)
+        return Operation('getattr', [subject, builder.const(name.value)])
     raise Exception("%s: cannot compile %r" % (parser.linecol(expr.location), expr))
 
 

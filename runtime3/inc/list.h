@@ -1,3 +1,5 @@
+extern vm_typespec vm_list_type;
+
 vm_value vm_new_list();
 void     vm_list_append(vm_value list, vm_value item);
 size_t   vm_list_length(vm_value list);

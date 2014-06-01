@@ -17,6 +17,10 @@ void*    vm_unbox_object(vm_value value);
 vm_value vm_box_boolean(int boolean);
 
 int      vm_unbox_boolean(vm_value value);
+
+#define vm_tag_integer vm_tag_double
+#define vm_box_integer(i) vm_box_double((double)(i))
+#define vm_unbox_integer(i) (long)(vm_unbox_double(i))
 vm_value vm_box_double(double value);
 double   vm_unbox_double(vm_value value);
 

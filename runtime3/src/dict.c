@@ -1,8 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include "gc.h"
-#include "value.h"
-#include "dict.h"
+#include "api.h"
 #include "cmp.h"
 
 typedef struct
@@ -19,15 +17,35 @@ typedef struct
     vm_dict_entry *entries;
 } vm_dict;
 
-vm_value vm_new_dict()
+size_t   vm_dict_sizeof()
 {
-    vm_dict* dict;
+    return sizeof(vm_dict);
+}
 
-    dict = malloc(sizeof(*dict));
+static vm_value dict_factory()
+{
+    
+    return vm_box_object(0);
+}
+vm_typespec vm_dict_type = {sizeof(vm_dict), 0, dict_factory};
+
+vm_value vm_dict_init(void* address)
+{
+    vm_dict *dict;
+
+    dict = address;
     dict->size   = 0;
     dict->length = 0;
     dict->entries = NULL;
     return vm_box_object(dict);
+}
+
+vm_value vm_new_dict()
+{
+    vm_dict* dict;
+
+    dict = vm_instantiate(&vm_dict_type, 0);
+    return vm_dict_init(dict);
 }
 
 size_t   vm_dict_length(vm_value dict)
