@@ -52,7 +52,7 @@ def compile_closure(function, gktable, gk, uvtable):
         if variable.upvalue:
             utable.append(variable)
             if variable in vtable:
-                asm.append( proxy.bcode("setupval", utable.index(variable), vtable.index(variable)) )
+                asm.append( proxy.bcode("setupval", vtable.index(variable), utable.index(variable)) )
                 #        runtime.abc("SETUPVAL", utable.index(variable), vtable.index(variable)) )
         elif variable not in vtable:
             vtable.append(variable)
@@ -104,7 +104,7 @@ def to_bytecode(asm, stmt, dreg, env):
         if stmt.dst in vtable:
             return asm.append(proxy.bcode('move', vtable.index(stmt.dst), dreg))
         else:
-            return asm.append(proxy.bcode('setupval', utable.index(stmt.dst), dreg))
+            return asm.append(proxy.bcode('setupval', dreg, utable.index(stmt.dst)))
     elif isinstance(stmt, Variable):
         if stmt in vtable:
             return asm.append(proxy.bcode('move', dreg, vtable.index(stmt)))
@@ -289,10 +289,20 @@ def compile_expression(builder, expr):
     if expr.group == 'float':
         return builder.const(float(expr.value))
     if expr.group == 'call':
-        if expr[0].group == 'attribute':
-            raise Exception("Blah" + repr(expr))
-        args = [compile_expression(builder, e) for e in expr]
-        return Operation('call', args)
+        callee = expr[0]
+        args   = expr[1:]
+        if callee.group == 'attribute':
+            opname = 'callattr'
+            if callee[1].group == 'attribute':
+                 subject = compile_expression(builder, callee[0])
+                 attr    = builder.const(callee[1].value)
+                 prefix = [subject, attr]
+        else:
+            callee = compile_expression(builder, callee)
+            prefix = [callee]
+            opname = 'call'
+        args = [compile_expression(builder, e) for e in args]
+        return Operation(opname, prefix + args)
     if expr.group == 'infix':
         op, lhs, rhs = expr
         lhs = compile_expression(builder, lhs)

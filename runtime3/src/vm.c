@@ -5,125 +5,24 @@
 #include <string.h>
 #include "api.h"
 
-static vm_value descriptor_factory()
-{
-    return vm_box_object(0);
-}
-
-vm_typespec vm_descriptor_type = {sizeof(vm_descriptor), 0, descriptor_factory};
-
-static vm_value closure_factory()
-{
-    return vm_box_object(0);
-}
-
-vm_typespec vm_closure_type = {sizeof(vm_closure), 0, closure_factory};
-
-static vm_value context_factory()
-{
-    return vm_box_object(0);
-}
-
-vm_typespec vm_context_type = {sizeof(vm_context), 0, context_factory};
-
-vm_descriptor* vm_new_descriptor(
-        size_t argc,
-        size_t valc,
-        size_t upvalc,
-        size_t upcopyc,
-        size_t size,
-        uint16_t* upcopy,
-        uint8_t* program,
-        vm_value functions,
-        vm_value constants)
-{
-    vm_descriptor* desc;
-
-    desc = vm_instantiate(&vm_descriptor_type, 0);
-    desc->argc = argc;
-    desc->valc = valc;
-    desc->upvalc = upvalc;
-    desc->upcopyc = upcopyc;
-    desc->upcopy = realloc(NULL, sizeof(*upcopy) * upcopyc);
-    memcpy(desc->upcopy, upcopy, sizeof(*upcopy) * upcopyc);
-    desc->size = size;
-    desc->program = realloc(NULL, size);
-    memcpy(desc->program, program, size);
-    desc->functions = functions;
-    desc->constants = constants;
-    return desc;
-}
-
-vm_closure* vm_new_closure(vm_descriptor* desc, vm_value** upvalues)
-{
-    vm_closure* closure;
-    int i;
-
-    closure = vm_instantiate(&vm_closure_type, sizeof(*upvalues) * desc->upcopyc);
-    closure->desc = desc;
-    for(i = 0; i < desc->upcopyc; i++)
-    {
-        closure->upvalues[i] = upvalues[desc->upcopy[i]];
-    }
-    return closure;
-}
-
-vm_context* vm_new_context()
-{
-    vm_context* context;
-
-    context = vm_instantiate(&vm_context_type, 0);
-    context->frame = -1;
-    return context;
-}
-
-void vm_context_push(vm_context* context, vm_value self, vm_closure* closure, vm_value* base, int argc)
-{
-    vm_descriptor* desc = closure->desc;
-    int i;
-
-    if (base == NULL) base = context->stack + 1;
-
-    vm_frame* frame = &context->frames[++context->frame];
-    frame->desc    = desc;
-    frame->closure = closure;
-    frame->pc      = desc->program;
-    frame->base    = base;
-    frame->top     = base + desc->valc;
-    frame->self    = self;
-    frame->upvalues = realloc(NULL, sizeof(*frame->upvalues) * desc->upvalc);
-    for(i = 0; i < desc->upcopyc; i++)
-    {
-        frame->upvalues[i] = closure->upvalues[i];
-    }
-    frame->upvalues[i] = realloc(NULL, sizeof(vm_value) * (desc->upvalc - i));
-    for(i++; i < desc->upvalc; i++)
-    {
-        frame->upvalues[i] = frame->upvalues[i-1] + 1;
-    }
-    for(i = argc; i < desc->argc; i++)
-    {
-        frame->base[i] = vm_box_object(NULL);
-    }
-}
-
-void vm_call(vm_context* ctx, vm_value self, vm_value function, vm_value* base, int argc)
+void vm_call(vm_context* ctx, vm_value self, vm_value function, int argc, int base)
 {
     vm_value interface;
+    int lastbase;
 
+    lastbase  = vm_stack_current_frame(ctx->stack)->base;
     interface = vm_get_interface(function);
-
     if (interface == vm_typespec_interface(&vm_apifunc_type))
     {
-        ctx->cself = self;
-        ctx->cbase = base;
-        ctx->ctop  = base+argc;
-        base[-1] = vm_box_object(NULL);
+
+        vm_stack_c_push(ctx->stack, self, argc, lastbase+base);
+        vm_stack_current_base(ctx->stack)[-1] = vm_null;
         vm_unbox_apifunc(function)(ctx);
+        vm_stack_c_pop(ctx->stack);
     }
-    else if (interface == vm_typespec_interface(&vm_descriptor_type))
+    else if (interface == vm_typespec_interface(&vm_closure_type))
     {
-        vm_context_push(ctx, self, vm_unbox_object(function), base, argc);
+        vm_stack_push(ctx->stack, self, argc, lastbase+base);
     }
     else
     {
@@ -132,13 +31,13 @@ void vm_call(vm_context* ctx, vm_value self, vm_value function, vm_value* base, 
 }
 
 static vm_value vm_symbol_get = 0;
-static vm_value vm_symbol_set = 0;
+//static vm_value vm_symbol_set = 0;
 
-void vm_getattr(vm_context* ctx, vm_value* base)
+void vm_getattr(vm_context* ctx, int base) //vm_value* base)
 {
     vm_value interface, value, handler;
-    vm_value subject = base[0];
-    vm_value name    = base[1];
+    vm_value subject = vm_stack_current_base(ctx->stack)[base+0];
+    vm_value name    = vm_stack_current_base(ctx->stack)[base+1];
 
     interface = vm_get_interface(subject);
     if (vm_type_getitem(interface, name, &value))
@@ -152,17 +51,18 @@ void vm_getattr(vm_context* ctx, vm_value* base)
             {
                 VM_STUB();
             }
-            base[1] = subject;
-            vm_call(ctx, subject, handler, base+1, 1);
+            vm_stack_current_base(ctx->stack)[base+1] = subject;
+            vm_call(ctx, subject, handler, 1, base+1);
+            //VM_STUB(); //vm_call(ctx, subject, handler, base+1, 1);
         }
         else if (vm_type_getitem(interface, vm_symbol_get, &handler))
         {
-            base[1] = subject;
-            vm_call(ctx, subject, handler, base+1, 1);
+            vm_stack_current_base(ctx->stack)[base+1] = subject;
+            VM_STUB(); //vm_call(ctx, subject, handler, base+1, 1);
         }
         else
         {
-            base[0] = value;
+            vm_stack_current_base(ctx->stack)[base+0] = value;
         }
     }
     else
@@ -179,15 +79,17 @@ void vm_setattr(vm_context* ctx, vm_value* base)
     VM_STUB();
 }
 
-void vm_callattr(vm_context* ctx, vm_value subject, vm_value* base, int argc)
+void vm_callattr(vm_context* ctx, vm_value subject, int argc, int base)
 {
     vm_value interface, value;
-    vm_value  name   = base[0];
-    vm_value* args   = base+1;
+    vm_value  name   = vm_stack_current_base(ctx->stack)[base+0];
+    int       args   = base+1;
     interface = vm_get_interface(subject);
+
     if (vm_type_getitem(interface, name, &value))
     {
-        vm_call(ctx, subject, value, args, argc-1);
+        vm_call(ctx, subject, value, argc-1, args);
+        //VM_STUB(); //vm_call(ctx, subject, value, args, argc-1);
     }
     else
     {
@@ -197,10 +99,10 @@ void vm_callattr(vm_context* ctx, vm_value subject, vm_value* base, int argc)
 
 void vm_loop(vm_context* ctx)
 {
-    if(ctx->frame < 0) return;
-    vm_frame* frame = &ctx->frames[ctx->frame];
+    if(ctx->stack == NULL) return;
+    vm_frame* frame = vm_stack_current_frame(ctx->stack);
     uint8_t*  pc   = frame->pc;
-    vm_value* base = frame->base;
+    vm_value* base = vm_stack_current_base(ctx->stack);
     int op, a, b, c, d;
 
     const void* optable[] = {
@@ -220,7 +122,11 @@ void vm_loop(vm_context* ctx)
         &&op_tailcall,
         &&op_getattr,
         &&op_callattr,
-        &&op_setattr
+        &&op_setattr,
+        &&op_gt,
+        &&op_sub,
+        &&op_mul,
+        &&op_loop,
     };
 
         //op_getattr,
@@ -270,11 +176,13 @@ op_testn: /* testn src off */
     if (vm_false(base[a])) pc += d - 0x8000;
     goto next;
 op_return: /* return src */
-    base[-1] = base[a];
-    if(--ctx->frame < 0) return;
-    frame = &ctx->frames[ctx->frame];
+    if (!vm_stack_return(ctx, base[a]))
+    {
+        return;
+    }
+    frame = vm_stack_current_frame(ctx->stack);
+    base  = vm_stack_current_base(ctx->stack);
     pc    = frame->pc;
-    base  = frame->base;
     goto next;
 op_closure: /* closure dst func */
     base[a] = vm_box_object(
@@ -283,44 +191,88 @@ op_closure: /* closure dst func */
     goto next;
 op_call: /* call start stop */
     frame->pc   = pc;
-    frame->base = base;
-    vm_call(ctx, frame->self, base[a], base+a+1, b-a-1);
-    frame = &ctx->frames[ctx->frame];
+    vm_call(ctx, frame->self, base[a], b-a-1, a+1);
+    frame = vm_stack_current_frame(ctx->stack);
+    base  = vm_stack_current_base(ctx->stack);
     pc    = frame->pc;
-    base  = frame->base;
     goto next;
 op_tailcall: /* tailcall start stop */
+    /*
     ctx->frame--;
     c = -1;
     while (a < b) base[c++] = base[a++];
     vm_call(ctx, frame->self, base[-1], base, c);
     //vm_context_push(ctx, vm_unbox_object(base[-1]), base, c);
+    ctx   = ctx->next;
     frame = &ctx->frames[ctx->frame];
     pc    = frame->pc;
     base  = frame->base;
+    */
+    VM_STUB();
     goto next;
 op_getattr: /* getattr base */
     frame->pc   = pc;
-    frame->base = base;
-    vm_getattr(ctx, base+a);
-    frame = &ctx->frames[ctx->frame];
+
+    vm_getattr(ctx, a);
+    frame = vm_stack_current_frame(ctx->stack);
+    base  = vm_stack_current_base(ctx->stack);
     pc    = frame->pc;
-    base  = frame->base;
     goto next;
 op_callattr: /* callattr subject start stop */
     frame->pc   = pc;
+    vm_callattr(ctx, base[a], c - b, b);
+    frame = vm_stack_current_frame(ctx->stack);
+    base  = vm_stack_current_base(ctx->stack);
+    pc    = frame->pc;
+    /*
     frame->base = base;
-    vm_callattr(ctx, base[a], base+b, c - b);
+    ctx   = ctx->next;
     frame = &ctx->frames[ctx->frame];
     pc    = frame->pc;
     base  = frame->base;
+    */
     goto next;
 op_setattr: /* setattr base */
+    VM_STUB();
+    /*
     frame->pc   = pc;
     frame->base = base;
     vm_setattr(ctx, base+a);
+    ctx   = ctx->next;
     frame = &ctx->frames[ctx->frame];
     pc    = frame->pc;
     base  = frame->base;
+    */
+    goto next;
+op_gt: /* gt dst src src */
+    //base[a] = base[b] > base[c]
+    if (vm_unbox_tag(base[b]) == vm_unbox_tag(base[c]) && vm_tag_double == vm_unbox_tag(base[c]))
+    {
+        base[a] = vm_box_boolean(vm_unbox_double(base[b]) > vm_unbox_double(base[c]));
+    } else
+    {
+        VM_STUB();
+    }
+    goto next;
+op_sub: /* sub dst src src */
+    if (vm_unbox_tag(base[b]) == vm_unbox_tag(base[c]) && vm_tag_double == vm_unbox_tag(base[c]))
+    {
+        base[a] = vm_box_double(vm_unbox_double(base[b]) - vm_unbox_double(base[c]));
+    } else
+    {
+        VM_STUB();
+    }
+    goto next;
+op_mul: /* mul dst src src */
+    if (vm_unbox_tag(base[b]) == vm_unbox_tag(base[c]) && vm_tag_double == vm_unbox_tag(base[c]))
+    {
+        base[a] = vm_box_double(vm_unbox_double(base[b]) * vm_unbox_double(base[c]));
+    } else
+    {
+        VM_STUB();
+    }
+    goto next;
+
+op_loop: /* loop */
     goto next;
 }

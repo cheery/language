@@ -1,9 +1,11 @@
 #include <stdint.h>
 #include "value.h"
 #include "gc.h"
-#include "context.h"
 
 typedef struct vm_typespec vm_typespec;
+
+#include "vm.h"
+#include "context.h"
 
 typedef struct
 {
@@ -58,3 +60,5 @@ void     vm_type_method(vm_value type, const char* name, vm_apifunc);
 extern vm_typespec vm_string_type;
 extern vm_typespec vm_apifunc_type;
 extern vm_typespec vm_property_type;
+
+#define vm_null (vm_box_object(0))

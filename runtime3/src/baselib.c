@@ -81,10 +81,31 @@ static void make_list(vm_context* ctx)
     vm_return_value(ctx, vm_new_list());
 }
 
+static void getcurrent(vm_context* ctx)
+{
+    vm_return_value(ctx, vm_box_object(ctx->greenlet));
+}
+
+static void greenlet(vm_context* ctx)
+{
+    vm_greenlet* greenlet;
+    vm_value  self;
+    vm_value* args;
+    int argc;
+
+    argc = vm_get_argc(ctx);
+    self = vm_stack_current_frame(ctx->stack)->self;
+    args = vm_stack_current_base(ctx->stack);
+    greenlet = vm_new_greenlet(ctx->greenlet, self, argc, args);
+    vm_return_value(ctx, vm_box_object(greenlet));
+}
+
 static vm_lib vm_base_library[] = {
     {"print", print},
     {"input", input},
     {"list", make_list},
+    {"getcurrent", getcurrent},
+    {"greenlet",   greenlet},
     {NULL, NULL}
 };
 

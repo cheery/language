@@ -1,0 +1,6 @@
+lst = list()
+print "list length: ", lst.length
+lst.append 1
+lst.append 2
+lst.append 3
+print "list length: ", lst.length

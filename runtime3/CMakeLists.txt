@@ -13,8 +13,12 @@ SET(AMBROSIA_SRC
     src/api.c
     src/baselib.c
     src/cmp.c
+    src/closure.c
+    src/context.c
     src/dict.c
+    src/greenlet.c
     src/list.c
+    src/stack.c
     src/type.c
     src/value.c
     src/vm.c

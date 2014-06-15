@@ -1,0 +1,5 @@
+a = 5
+while a > 0
+    print "bottles left: ", a
+    a = a - 1
+print "no bottles left!"

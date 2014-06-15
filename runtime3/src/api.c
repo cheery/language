@@ -24,20 +24,29 @@ vm_value vm_init()
 
 size_t   vm_get_argc(vm_context* ctx)
 {
-    return ctx->ctop - ctx->cbase;
+    vm_frame* frame;
+
+    frame = vm_stack_current_frame(ctx->stack);
+    return frame->top - frame->base;
 }
 
 vm_value vm_get_value(vm_context* ctx, int index)
 {
-    if (ctx->cbase+index < ctx->ctop) return ctx->cbase[index];
-    return vm_box_object(NULL);
+    vm_frame* frame;
+
+    frame = vm_stack_current_frame(ctx->stack);
+    if (frame->base+index < frame->top) return vm_stack_current_base(ctx->stack)[index];
+    return vm_null;
 }
 
 void* vm_get_self_object(vm_context* ctx, vm_typespec *spec)
 {
-    if (vm_get_interface(ctx->cself) == vm_typespec_interface(spec))
+    vm_value self;
+
+    self = vm_stack_current_frame(ctx->stack)->self;
+    if (vm_get_interface(self) == vm_typespec_interface(spec))
     {
-        return vm_unbox_object(ctx->cself);
+        return vm_unbox_object(self);
     }
     else
     {
@@ -47,11 +56,14 @@ void* vm_get_self_object(vm_context* ctx, vm_typespec *spec)
 
 void* vm_get_object(vm_context* ctx, int index, vm_typespec *spec)
 {
+    vm_frame* frame;
     vm_value value;
 
-    if (ctx->cbase+index < ctx->ctop)
+    frame = vm_stack_current_frame(ctx->stack);
+
+    if (frame->base+index < frame->top)
     {
-        value = ctx->cbase[index];
+        value = vm_stack_current_base(ctx->stack)[index];
         if (vm_get_interface(value) == vm_typespec_interface(spec))
         {
             return vm_unbox_object(value);
@@ -66,12 +78,12 @@ void* vm_get_object(vm_context* ctx, int index, vm_typespec *spec)
 
 void     vm_return_value(vm_context* ctx, vm_value value)
 {
-    ctx->cbase[-1] = value;
+    vm_stack_current_base(ctx->stack)[-1] = value;
 }
 
 void vm_init_typespec(vm_typespec* spec)
 {
-    if (spec->interface == vm_box_object(NULL))
+    if (spec->interface == vm_null)
     {
         spec->interface = spec->factory();
     }

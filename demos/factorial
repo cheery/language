@@ -1,0 +1,7 @@
+factorial = (a) ->
+    if a > 1
+        return factorial(a - 1) * a
+    else
+        return 1
+
+print "factorial: ", factorial(4)

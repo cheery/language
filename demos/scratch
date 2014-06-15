@@ -1,0 +1,48 @@
+try
+    raise("system failure")
+except
+    print("exception handled")
+
+print("normal routine")
+
+
+
+# #if false
+# #    print "hello! ", 1234
+# #elif true
+# #    print 0
+# #    print 1.5
+# #else
+# #    print 25
+# #print 60
+# 
+# 
+# #if false
+# #    print "tru!"
+# #elif true
+# #    print "faltru!" 
+# #else
+# #    print "false!"
+# 
+# name = input "what is your name? "
+# print "hello ", name
+# 
+# print "(success!)"
+# 
+##jello := "blah"
+#
+##greeting = "hello world"
+##print greeting, null
+##
+##a = 1 * 2 + 45
+##
+##if a < b
+##    print a
+##
+##while a
+##    print a
+##    a = a + 1
+##    if jesus
+##        break
+##
+##return 5

@@ -1,0 +1,17 @@
+ctxa = getcurrent()
+print "current context: ", ctxa
+
+print "in context a, creating greenlet"
+ctxb = greenlet () ->
+    print "in context b"
+    print "(ctxb) current context: ", getcurrent()
+    return "kak"
+
+print "next context: ", ctxb
+print "ctxb parent: ", ctxb.parent
+print "ctxb dead: ", ctxb.dead
+
+lol = ctxb.switch()
+print "other context returned: ", lol
+
+print "ctxb dead: ", ctxb.dead

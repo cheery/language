@@ -16,11 +16,15 @@ new_closure.argtypes = [c_void_p, c_void_p]
 
 new_context = lib.vm_new_context
 new_context.restype = c_void_p
-new_context.argtypes = []
+new_context.argtypes = [c_void_p]
 
-context_push = lib.vm_context_push
-context_push.restype = None
-context_push.argtypes = [c_void_p, c_void_p, c_void_p, c_void_p, c_int]
+#context_push = lib.vm_context_push
+#context_push.restype = None
+#context_push.argtypes = [c_void_p, c_void_p, c_void_p, c_void_p, c_int]
+
+context_bootup = lib.vm_context_bootup
+context_bootup.restype = None
+context_bootup.argtypes = [c_void_p, c_void_p]
 
 box_object = lib.vm_box_object
 box_object.restype = c_void_p
@@ -101,8 +105,10 @@ def build_descriptor(argc, valc, upvalc, upcopies, bytecode, functions, constant
 
 def run_toplevel(descriptor):
     closure = new_closure(descriptor, None)
-    context = new_context()
-    context_push(context, box_object(0), closure, None, 0)
+    context = new_context(None)
+    print "boot"
+    context_bootup(context, closure)
+    #context_push(context, box_object(0), closure, None, 0)
     print "trying to evaluate", descriptor, closure, context
     loop(context)
     print "success"
@@ -129,7 +135,8 @@ if __name__ == '__main__':
     descr = new_descriptor(argc, valc, upvalc, upcopyc, len(code), None, code, functions, constants)
     closure = new_closure(descr, None)
     ctx = new_context()
-    context_push(ctx, closure, None, 0)
+    context_bootup(ctx, closure)
+    #context_push(ctx, closure, None, 0)
 
     loop(ctx)
 

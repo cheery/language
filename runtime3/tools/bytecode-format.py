@@ -13,6 +13,8 @@ for opcode, opname in enumerate(r_opnames.findall(optab)):
     m = re.compile(pat).search(source)
     if m is not None:
         op["format"] = m.group(1).strip().split(' ')
+    else:
+        op["format"] = []
 
 json.dump(spec, open(sys.argv[1], 'w'))
 print("-- {} Generation done".format(sys.argv[1]))
