@@ -14,6 +14,11 @@ struct vm_frame
     vm_value self;
 };
 
+#define VM_APESHIT          0
+#define VM_NORMAL_EXCEPTION 1
+#define VM_HAPPY_ITERATOR   2
+
+
 vm_stack* vm_new_stack(vm_value self, int argc, vm_value* argv);
 void      vm_stack_push(vm_stack* stack, vm_value self, int argc, int base);
 void      vm_stack_c_push(vm_stack* stack, vm_value self, int argc, int base);
@@ -28,3 +33,9 @@ int       vm_stack_dead(vm_stack* stack);
 vm_frame* vm_stack_current_frame(vm_stack* stack);
 
 vm_value* vm_stack_current_base(vm_stack* stack);
+void      vm_stack_except(vm_stack* stack, uint8_t* pc, int type, int base);
+void      vm_stack_except_drop(vm_stack* stack, int count);
+
+int       vm_stack_except_type(vm_context* ctx);
+int       vm_stack_except_jump(vm_context* ctx);
+void      vm_stack_except_discard(vm_context* ctx);

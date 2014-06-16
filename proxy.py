@@ -1,5 +1,6 @@
 import ctypes
 import json
+import sys
 from ctypes import c_size_t, c_char_p, c_void_p, c_ushort, c_int, c_double, POINTER, byref
 vm_value = ctypes.c_ulong
 c_ushort_p = POINTER(c_ushort)
@@ -106,12 +107,12 @@ def build_descriptor(argc, valc, upvalc, upcopies, bytecode, functions, constant
 def run_toplevel(descriptor):
     closure = new_closure(descriptor, None)
     context = new_context(None)
-    print "boot"
+    sys.stderr.write("boot\n")
     context_bootup(context, closure)
     #context_push(context, box_object(0), closure, None, 0)
-    print "trying to evaluate", descriptor, closure, context
+    sys.stderr.write("trying to evaluate {}, {}, {}\n".format(descriptor, closure, context))
     loop(context)
-    print "success"
+    sys.stderr.write("success\n")
 
 if __name__ == '__main__':
     code = ''.join([

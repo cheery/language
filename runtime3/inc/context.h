@@ -1,3 +1,5 @@
+#include <setjmp.h>
+
 struct vm_context
 {
     //vm_object object;
@@ -8,6 +10,9 @@ struct vm_context
     vm_stack*    stack;
     vm_greenlet* greenlet;
 
+    jmp_buf          exception_return;
+    vm_value         exception_type;
+    vm_value         exception_value;
     //vm_descriptor* exception_desc;
     //size_t         exception_pc;
 };

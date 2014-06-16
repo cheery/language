@@ -32,6 +32,8 @@ void vm_call(vm_context* ctx, vm_value self, vm_value function, int argc, int ba
 
 static vm_value vm_symbol_get = 0;
 //static vm_value vm_symbol_set = 0;
+static vm_value vm_symbol_iter = 0;
+static vm_value vm_symbol_next = 0;
 
 void vm_getattr(vm_context* ctx, int base) //vm_value* base)
 {
@@ -79,6 +81,46 @@ void vm_setattr(vm_context* ctx, vm_value* base)
     VM_STUB();
 }
 
+void vm_iter(vm_context* ctx, int base, int src)
+{
+    vm_value interface, handler;
+    vm_value self    = vm_stack_current_frame(ctx->stack)->self;
+    vm_value subject = vm_stack_current_base(ctx->stack)[src];
+
+    interface = vm_get_interface(subject);
+
+    if (!vm_symbol_iter) vm_symbol_iter = vm_box_cstring("+iter");
+    if (vm_type_getitem(interface, vm_symbol_iter, &handler))
+    {
+        vm_stack_current_base(ctx->stack)[base+0] = handler;
+        vm_stack_current_base(ctx->stack)[base+1] = self;
+        vm_call(ctx, subject, handler, 1, base+1);
+    }
+    else
+    {
+        vm_stack_current_base(ctx->stack)[base] = subject;
+    }
+}
+
+void vm_next(vm_context* ctx, int base, int iter, uint8_t* pc)
+{
+    vm_value interface, handler;
+    vm_value iterator = vm_stack_current_base(ctx->stack)[iter];
+
+    vm_stack_except(ctx->stack, pc, VM_HAPPY_ITERATOR, 0);
+    interface = vm_get_interface(iterator);
+    if (!vm_symbol_next) vm_symbol_next = vm_box_cstring("+next");
+    if (vm_type_getitem(interface, vm_symbol_next, &handler))
+    {
+        vm_stack_current_base(ctx->stack)[base+0] = handler;
+        vm_call(ctx, iterator, handler, 0, base+1);
+    }
+    else
+    {
+        VM_STUB();
+    }
+}
+
 void vm_callattr(vm_context* ctx, vm_value subject, int argc, int base)
 {
     vm_value interface, value;
@@ -103,7 +145,8 @@ void vm_loop(vm_context* ctx)
     vm_frame* frame = vm_stack_current_frame(ctx->stack);
     uint8_t*  pc   = frame->pc;
     vm_value* base = vm_stack_current_base(ctx->stack);
-    int op, a, b, c, d;
+    int op, a, b, c, d, e;
+    int except_type, except_base;
 
     const void* optable[] = {
         &&op_move,
@@ -127,11 +170,41 @@ void vm_loop(vm_context* ctx)
         &&op_sub,
         &&op_mul,
         &&op_loop,
+        &&op_except,
+        &&op_iter,
+        &&op_next,
+        &&op_nextc
     };
 
-        //op_getattr,
-        //op_setattr,
-        //op_callattr,
+    if ((e = setjmp(ctx->exception_return)))
+    {
+        except_type = vm_stack_except_type(ctx);
+        if (except_type == VM_APESHIT)
+        {
+            VM_STUB();
+        }
+        else if (except_type == VM_NORMAL_EXCEPTION)
+        {
+            //while(vm_stack_unroll(ctx));
+            except_base = vm_stack_except_jump(ctx);
+        }
+        else if (except_type == VM_HAPPY_ITERATOR)
+        {
+            if (ctx->exception_type != vm_typespec_interface(&vm_stopiteration_type))
+            {
+                vm_stack_except_discard(ctx);
+                longjmp(ctx->exception_return, e);
+            }
+            except_base = vm_stack_except_jump(ctx);
+        }
+        else
+        {
+            VM_STUB();
+        }
+        frame = vm_stack_current_frame(ctx->stack);
+        pc    = frame->pc;
+        base  = vm_stack_current_base(ctx->stack);
+    }
         //op_getitem,
         //op_setitem,
         //add sub mul div pow unm not cat
@@ -143,7 +216,7 @@ next:
     c  = pc[3];
     d  = b | c << 8;
     pc += 4;
-    printf("%i: op[%i](%i, %i, %i | %i)\n", (int)((pc - frame->desc->program - 4) >> 2), op, a, b, c, d);
+    fprintf(stderr, "%i: op[%i](%i, %i, %i | %i)\n", (int)((pc - frame->desc->program - 4) >> 2), op, a, b, c, d);
     goto *optable[op];
 op_move: /* move dst src */
     base[a] = base[b];
@@ -166,7 +239,8 @@ op_getconst: /* getconst dst const */
 op_setconst: /* setconst src const */
     vm_list_setitem(frame->desc->constants, d, base[a]);
     goto next;
-op_jump: /* jump ign off */
+op_jump: /* jump drop off */
+    if (a > 0) vm_stack_except_drop(ctx->stack, a);
     pc += d - 0x8000;
     goto next;
 op_test: /* test src off */
@@ -274,5 +348,23 @@ op_mul: /* mul dst src src */
     goto next;
 
 op_loop: /* loop */
+    goto next;
+
+op_except: /* expect base off */
+    vm_stack_except(ctx->stack, pc + d - 0x8000, VM_NORMAL_EXCEPTION, a);
+    goto next;
+
+op_iter: /* iter base src */
+    vm_iter(ctx, a, b);
+    goto next;
+
+op_next: /* next base iter */
+    d  = pc[2] | pc[3] << 8;
+    pc += 4;
+    vm_next(ctx, a, b, pc + d - 0x8000);
+    goto next;
+
+op_nextc: /* nextc ign off */
+    VM_STUB();
     goto next;
 }

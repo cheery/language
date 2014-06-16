@@ -48,7 +48,7 @@ def compile_closure(function, gktable, gk, uvtable):
             utable.append(nl.value)
     #assert len(uctable) == 0
     #print "UC", uctable, utable
-    for variable in function.variables.values():
+    for variable in function.variables:
         if variable.upvalue:
             utable.append(variable)
             if variable in vtable:
@@ -105,6 +105,9 @@ def to_bytecode(asm, stmt, dreg, env):
             return asm.append(proxy.bcode('move', vtable.index(stmt.dst), dreg))
         else:
             return asm.append(proxy.bcode('setupval', dreg, utable.index(stmt.dst)))
+    elif isinstance(stmt, Iter):
+        to_bytecode(asm, stmt.src, dreg, env)
+        return asm.append(proxy.bcode('iter', dreg, dreg))
     elif isinstance(stmt, Variable):
         if stmt in vtable:
             return asm.append(proxy.bcode('move', dreg, vtable.index(stmt)))
@@ -117,12 +120,20 @@ def to_bytecode(asm, stmt, dreg, env):
         else:
             return asm.append(proxy.bcode('test',  dreg, 0), link=stmt.then)
     elif isinstance(stmt, Jump):
-        return asm.append(proxy.bcode('jump', 0, 0), link=stmt.then)
+        return asm.append(proxy.bcode('jump', stmt.drop, 0), link=stmt.then)
     elif isinstance(stmt, Return):
         to_bytecode(asm, stmt.value, dreg, env)
         return asm.append(proxy.bcode('return', dreg, 1))
     elif isinstance(stmt, Function):
         return asm.append(proxy.bcode('closure', dreg, ftable.index(stmt)))
+    elif isinstance(stmt, Try):
+        if stmt.exc != None:
+            asm.append(proxy.bcode('except', 0, 0), link=stmt.exc)
+        return
+    elif isinstance(stmt, Next):
+        asm.append(proxy.bcode('next', dreg, vtable.index(stmt.it)))
+        asm.append(proxy.bcode('nextc', 0, 0), link=stmt.stop)
+        return
     elif stmt is True:
         return asm.append(proxy.bcode('loadbool', dreg, 1))
     elif stmt is False:
@@ -242,12 +253,47 @@ def compile_sentence_toplevel(builder, snt):
         builder.goto(loop, exit)
         builder.loops.pop(-1)
         return
+    if symbole(snt[0], 'for') and symbole(snt[2], 'in'):
+        loop = builder.new_block()
+        exit = builder.new_block()
+        var = builder.function.get(snt[1].value)
+        it  = builder.function.new_var()
+        builder.append(Move(it, Iter(compile_expression(builder, snt[3]))))
+        builder.goto(loop, loop)
+        builder.append(Move(var, Next(it, exit)))
+        for node in snt[4]:
+            compile_sentence_toplevel(builder, node)
+        builder.goto(loop, exit)
+        return
+    if symbole(snt[0], 'once') and symbole(snt[2], 'in'):
+        exit = builder.new_block()
+        var = builder.function.get(snt[1].value)
+        it  = builder.function.new_var()
+        builder.append(Move(it, Iter(compile_expression(builder, snt[3]))))
+        builder.append(Move(var, Next(it, exit)))
+        for node in snt[4]:
+            compile_sentence_toplevel(builder, node)
+        builder.goto(exit, exit)
+        return
     if len(builder.loops) > 0 and symbole(snt[0], 'continue'):
         builder.goto(builder.loops[-1][0], None)
     if len(builder.loops) > 0 and symbole(snt[0], 'break'):
         builder.goto(builder.loops[-1][1], None)
     if symbole(snt[0], 'return'):
         builder.ret(compile_expression(builder, snt[1]))
+        return
+    if symbole(snt[0], 'try'):
+        exit = builder.trying()
+        for node in snt[-1]:
+            compile_sentence_toplevel(builder, node)
+        builder.donetrying()
+        builder.goto(exit, exit, drop=1)
+        return
+    if symbole(snt[0], 'except'):
+        exit = builder.except_block()
+        for node in snt[-1]:
+            compile_sentence_toplevel(builder, node)
+        builder.goto(exit, exit)
         return
     builder.append(compile_sentence(builder, snt))
 
@@ -349,6 +395,8 @@ class Build(object):
         self.block = self.new_block()
         self.otherwise_exit = None
         self.loops = []
+        self.try_block = None
+        self.try_post_block = None
 
     def new_block(self):
         block = Block()
@@ -380,37 +428,59 @@ class Build(object):
     def test(self, cond, then, inverse=False):
         self.append(Test(cond, then, inverse))
 
-    def goto(self, then, nxt=None):
-        self.append(Jump(then))
+    def goto(self, then, nxt=None, drop=0):
+        self.append(Jump(then, drop))
         self.block = nxt
 
     def ret(self, value, nxt=None):
         self.append(Return(value))
         self.block = nxt
 
+    def trying(self):
+        exit = self.new_block()
+        tr = Try()
+        self.append(tr)
+        self.try_block = [tr, exit]
+        return exit
+
+    def donetrying(self):
+        self.try_post_block = self.try_block
+        self.try_block = None
+
+    def except_block(self):
+        exc = self.try_post_block[0].exc = self.new_block()
+        self.block = exc
+        return self.try_post_block[1]
+
 class Function(object):
     def __init__(self):
         self.argvar = []
-        self.variables = {}
+        self.variables = []
+        self.binds     = {}
         self.nonlocals = {}
         self.blocks = []
         self.functions = []
 
     def get(self, name):
-        if name in self.variables:
-            variable = self.variables[name]
+        if name in self.binds:
+            variable = self.binds[name]
         else:
-            variable = self.variables[name] = Variable(self, name)
+            variable = self.binds[name] = self.new_var(name)
         return variable
 
     def lookup(self, name):
-        if name in self.variables:
-            return self.variables[name]
+        if name in self.binds:
+            return self.binds[name]
         elif name in self.nonlocals:
             nl = self.nonlocals[name]
         else:
             nl = self.nonlocals[name] = NonLocal(name)
         return nl
+
+    def new_var(self, name=None):
+        var = Variable(self, name)
+        self.variables.append(var)
+        return var
 
 class Block(object):
     def __init__(self):
@@ -449,8 +519,9 @@ class Test(object):
         return 'test ' + repr(self.cond) + ' ' + repr(self.then)
 
 class Jump(object):
-    def __init__(self, then):
+    def __init__(self, then, drop=0):
         self.then = then
+        self.drop = drop
 
     def __repr__(self):
         return 'jump ' + repr(self.then)
@@ -461,6 +532,19 @@ class Return(object):
 
     def __repr__(self):
         return 'return ' + repr(self.value)
+
+class Try(object):
+    def __init__(self, exc=None):
+        self.exc = exc
+
+class Iter(object):
+    def __init__(self, src):
+        self.src = src
+
+class Next(object):
+    def __init__(self, it, stop=None):
+        self.it   = it
+        self.stop = stop
 
 class Variable(object):
     def __init__(self, function, name):

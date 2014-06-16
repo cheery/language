@@ -1,11 +1,3 @@
-try
-    raise("system failure")
-except
-    print("exception handled")
-
-print("normal routine")
-
-
 
 # #if false
 # #    print "hello! ", 1234

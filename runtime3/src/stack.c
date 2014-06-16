@@ -1,6 +1,14 @@
 #include <stdlib.h>
 #include "api.h"
 
+typedef struct
+{
+    int frame;
+    int type;
+    int base;
+    uint8_t* pc;
+} vm_except;
+
 struct vm_stack
 {
     vm_object object;
@@ -9,6 +17,8 @@ struct vm_stack
     int       ret;
     vm_value  values[4096];
     vm_frame  frames[1024];
+    vm_except excepts[256];
+    int       exc;
 };
 
 static vm_value stack_factory()
@@ -29,6 +39,7 @@ vm_stack* vm_new_stack(vm_value self, int argc, vm_value* argv)
     stack = vm_instantiate(&vm_stack_type, 0);
     stack->top     = -1;
     stack->ret     = -1;
+    stack->exc     = -1;
     stack->parent  = NULL;
     stack->frames[0].self = self;
     stack->frames[0].base = 0;
@@ -107,6 +118,13 @@ int vm_stack_return(vm_context* ctx, vm_value retval)
     vm_stack* stack;
 
     stack = ctx->stack;
+    while(stack->exc >= 0)
+    {
+        while (stack->excepts[stack->exc].frame == stack->top)
+        {
+            stack->exc--;
+        }
+    }
     if (stack->top == 0)
     {
         stack->top = -2;
@@ -249,4 +267,81 @@ vm_frame* vm_stack_current_frame(vm_stack* stack)
 vm_value* vm_stack_current_base(vm_stack* stack)
 {
     return &stack->values[vm_stack_current_frame(stack)->base];
+}
+
+void      vm_stack_except(vm_stack* stack, uint8_t* pc, int type, int base)
+{
+    vm_except* except;
+
+    except = &stack->excepts[++stack->exc];
+    except->frame = stack->top;
+    except->type = type;
+    except->base = base;
+    except->pc = pc;
+}
+
+void      vm_stack_except_drop(vm_stack* stack, int count)
+{
+    stack->exc -= count;
+    if (stack->exc >= 0)
+    {
+        while (stack->excepts[stack->exc+1].frame != stack->top) stack->exc++;
+    }
+}
+
+int       vm_stack_except_type(vm_context* ctx)
+{
+    vm_stack* stack;
+
+    stack = ctx->stack;
+    do
+    {
+        if (stack->exc >= 0)
+        {
+            return stack->excepts[stack->exc].type;
+        }
+        stack = stack->parent;
+    } while(stack);
+    return VM_APESHIT;
+}
+
+int       vm_stack_except_jump(vm_context* ctx)
+{
+    vm_stack* stack;
+    vm_except* except;
+
+    stack = ctx->stack;
+    do
+    {
+        if (stack->exc >= 0)
+        {
+            ctx->stack = stack;
+            except = &stack->excepts[stack->exc--];
+            stack->top = except->frame;
+            stack->frames[stack->top].pc = except->pc;
+            return except->base;
+        }
+        stack->parent = NULL;
+        stack->top = -2;
+        stack = stack->parent;
+    } while(stack);
+    VM_STUB();
+}
+
+void      vm_stack_except_discard(vm_context* ctx)
+{
+    vm_stack* stack;
+
+    stack = ctx->stack;
+    do
+    {
+        if (stack->exc >= 0)
+        {
+            ctx->stack = stack;
+            stack->exc--;
+            return;
+        }
+        stack = stack->parent;
+    } while(stack);
+    VM_STUB();
 }

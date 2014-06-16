@@ -54,6 +54,11 @@ void* vm_get_self_object(vm_context* ctx, vm_typespec *spec)
     }
 }
 
+vm_value vm_get_self(vm_context* ctx)
+{
+    return vm_stack_current_frame(ctx->stack)->self;
+}
+
 void* vm_get_object(vm_context* ctx, int index, vm_typespec *spec)
 {
     vm_frame* frame;
@@ -107,16 +112,6 @@ int vm_has_interface(vm_value value, vm_typespec* spec)
     vm_init_typespec(spec);
     return object->interface == spec->interface;
 }
-
-static vm_value string_factory()
-{
-    vm_value type;
-
-    type = vm_new_type();
-    return type;
-}
-
-vm_typespec vm_string_type = {0, 0, string_factory};
 
 static vm_value apifunc_factory()
 {
@@ -210,4 +205,20 @@ vm_value vm_property_get_call(vm_value value)
 
     property = vm_unbox_object(value);
     return property->call;
+}
+
+static vm_value stopiteration_factory()
+{
+    vm_value type;
+    
+    type = vm_new_type();
+    return type;
+}
+vm_typespec vm_stopiteration_type = {0, 0, stopiteration_factory};
+
+void     vm_stopiteration(vm_context* ctx)
+{
+    ctx->exception_type  = vm_typespec_interface(&vm_stopiteration_type);
+    ctx->exception_value = vm_null;
+    longjmp(ctx->exception_return, 2);
 }

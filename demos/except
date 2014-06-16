@@ -1,0 +1,6 @@
+try
+    error("system failure")
+except
+    print("exception handled")
+
+print("normal routine")

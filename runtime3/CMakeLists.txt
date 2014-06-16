@@ -19,6 +19,7 @@ SET(AMBROSIA_SRC
     src/greenlet.c
     src/list.c
     src/stack.c
+    src/string.c
     src/type.c
     src/value.c
     src/vm.c

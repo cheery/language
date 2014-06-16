@@ -18,6 +18,7 @@ vm_value vm_init();
 size_t   vm_get_argc(vm_context* ctx);
 vm_value  vm_get_value(vm_context* ctx, int index);
 void* vm_get_self_object(vm_context* ctx, vm_typespec *spec);
+vm_value vm_get_self(vm_context* ctx);
 void* vm_get_object(vm_context* ctx, int index, vm_typespec *spec);
 void     vm_return_value(vm_context* ctx, vm_value value);
 
@@ -47,6 +48,9 @@ vm_value vm_new_property(vm_value get, vm_value set, vm_value call);
 vm_value vm_property_get_get(vm_value value);
 vm_value vm_property_get_set(vm_value value);
 vm_value vm_property_get_call(vm_value value);
+
+extern vm_typespec vm_stopiteration_type;
+void     vm_stopiteration(vm_context* ctx);
 
 // defined in src/type.c
 extern vm_typespec vm_type;

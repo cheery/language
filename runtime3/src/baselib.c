@@ -100,12 +100,20 @@ static void greenlet(vm_context* ctx)
     vm_return_value(ctx, vm_box_object(greenlet));
 }
 
+static void throw_exception(vm_context* ctx)
+{
+    ctx->exception_type  = vm_null;
+    ctx->exception_value = vm_null;
+    longjmp(ctx->exception_return, 1);
+}
+
 static vm_lib vm_base_library[] = {
     {"print", print},
     {"input", input},
     {"list", make_list},
     {"getcurrent", getcurrent},
     {"greenlet",   greenlet},
+    {"error",      throw_exception},
     {NULL, NULL}
 };
 
