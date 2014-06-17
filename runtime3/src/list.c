@@ -29,12 +29,28 @@ static void get_length(vm_context* ctx)
     vm_return_value(ctx, vm_box_integer(list->length));
 }
 
+static void getitem(vm_context* ctx)
+{
+    vm_list* list;
+    long index;
+
+    list  = vm_get_self_object(ctx, &vm_list_type);
+    index = vm_get_integer(ctx, 0);
+    if (index >= list->length)
+    {
+        VM_STUB();
+    }
+    vm_return_value(ctx, list->values[index]);
+}
+
+
 static vm_value list_factory()
 {
     vm_value type;
     
     type = vm_new_type();
     vm_type_method(type, "append", append);
+    vm_type_method(type, "+getitem", getitem);
     vm_type_setitem(type, vm_box_cstring("length"), vm_new_property(vm_box_apifunc(get_length), 0, 0));
 
     return type;

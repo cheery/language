@@ -34,6 +34,7 @@ static vm_value vm_symbol_get = 0;
 //static vm_value vm_symbol_set = 0;
 static vm_value vm_symbol_iter = 0;
 static vm_value vm_symbol_next = 0;
+static vm_value vm_symbol_getitem = 0;
 
 void vm_getattr(vm_context* ctx, int base) //vm_value* base)
 {
@@ -109,7 +110,7 @@ void vm_next(vm_context* ctx, int base, int iter, uint8_t* pc)
 
     vm_stack_except(ctx->stack, pc, VM_HAPPY_ITERATOR, 0);
     interface = vm_get_interface(iterator);
-    if (!vm_symbol_next) vm_symbol_next = vm_box_cstring("+next");
+    if (!vm_symbol_next) vm_symbol_next = vm_box_cstring("next");
     if (vm_type_getitem(interface, vm_symbol_next, &handler))
     {
         vm_stack_current_base(ctx->stack)[base+0] = handler;
@@ -139,6 +140,24 @@ void vm_callattr(vm_context* ctx, vm_value subject, int argc, int base)
     }
 }
 
+void vm_getitem(vm_context* ctx, int base)
+{
+    vm_value interface, handler;
+    vm_value subject = vm_stack_current_base(ctx->stack)[base];
+
+    interface = vm_get_interface(subject);
+    if (!vm_symbol_getitem) vm_symbol_getitem = vm_box_cstring("+getitem");
+    if (vm_type_getitem(interface, vm_symbol_getitem, &handler))
+    {
+        vm_stack_current_base(ctx->stack)[base+0] = handler;
+        vm_call(ctx, subject, handler, 1, base+1);
+    }
+    else
+    {
+        VM_STUB();
+    }
+}
+
 void vm_loop(vm_context* ctx)
 {
     if(ctx->stack == NULL) return;
@@ -159,21 +178,23 @@ void vm_loop(vm_context* ctx)
         &&op_jump,     // 7
         &&op_test,
         &&op_testn,    // 9
-        &&op_return,
+        &&op_return,   // 10
         &&op_closure,
         &&op_call,     // 12
         &&op_tailcall,
         &&op_getattr,
         &&op_callattr,
-        &&op_setattr,
+        &&op_setattr,  // 16
         &&op_gt,
         &&op_sub,
         &&op_mul,
         &&op_loop,
         &&op_except,
-        &&op_iter,
+        &&op_iter,     // 22
         &&op_next,
-        &&op_nextc
+        &&op_nextc,
+        &&op_eq,
+        &&op_getitem,
     };
 
     if ((e = setjmp(ctx->exception_return)))
@@ -318,6 +339,16 @@ op_setattr: /* setattr base */
     base  = frame->base;
     */
     goto next;
+op_eq: /* eq dst src src */
+    //base[a] = base[b] > base[c]
+    if (vm_unbox_tag(base[b]) == vm_unbox_tag(base[c]) && vm_tag_double == vm_unbox_tag(base[c]))
+    {
+        base[a] = vm_box_boolean(vm_unbox_double(base[b]) == vm_unbox_double(base[c]));
+    } else
+    {
+        VM_STUB();
+    }
+    goto next;
 op_gt: /* gt dst src src */
     //base[a] = base[b] > base[c]
     if (vm_unbox_tag(base[b]) == vm_unbox_tag(base[c]) && vm_tag_double == vm_unbox_tag(base[c]))
@@ -366,5 +397,9 @@ op_next: /* next base iter */
 
 op_nextc: /* nextc ign off */
     VM_STUB();
+    goto next;
+
+op_getitem: /* getitem base */
+    vm_getitem(ctx, a);
     goto next;
 }

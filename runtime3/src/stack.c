@@ -118,12 +118,9 @@ int vm_stack_return(vm_context* ctx, vm_value retval)
     vm_stack* stack;
 
     stack = ctx->stack;
-    while(stack->exc >= 0)
+    while(stack->exc >= 0 && stack->excepts[stack->exc].frame == stack->top)
     {
-        while (stack->excepts[stack->exc].frame == stack->top)
-        {
-            stack->exc--;
-        }
+        stack->exc--;
     }
     if (stack->top == 0)
     {

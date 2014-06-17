@@ -35,7 +35,7 @@ static vm_value string_iterator_factory()
     vm_value type;
 
     type = vm_new_type();
-    vm_type_method(type, "+next", string_iterator_next);
+    vm_type_method(type, "next", string_iterator_next);
     return type;
 }
 

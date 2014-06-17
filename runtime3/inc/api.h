@@ -16,7 +16,8 @@ typedef struct
 vm_value vm_new_api(vm_lib* lib);
 vm_value vm_init();
 size_t   vm_get_argc(vm_context* ctx);
-vm_value  vm_get_value(vm_context* ctx, int index);
+vm_value vm_get_value(vm_context* ctx, int index);
+long     vm_get_integer(vm_context* ctx, int index);
 void* vm_get_self_object(vm_context* ctx, vm_typespec *spec);
 vm_value vm_get_self(vm_context* ctx);
 void* vm_get_object(vm_context* ctx, int index, vm_typespec *spec);

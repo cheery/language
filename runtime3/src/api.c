@@ -39,6 +39,21 @@ vm_value vm_get_value(vm_context* ctx, int index)
     return vm_null;
 }
 
+long     vm_get_integer(vm_context* ctx, int index)
+{
+    vm_value value;
+
+    value = vm_get_value(ctx, index);
+    if (vm_unbox_tag(value) == vm_tag_integer)
+    {
+        return vm_unbox_integer(value);
+    }
+    else
+    {
+        VM_STUB();
+    }
+}
+
 void* vm_get_self_object(vm_context* ctx, vm_typespec *spec)
 {
     vm_value self;

@@ -173,7 +173,15 @@ def to_bytecode(asm, stmt, dreg, env):
                 args.append(dreg+i)
                 i+=1
         return asm.append(proxy.bcode(name, dreg, *args))
-
+    elif stmt.name == 'getitem':
+        to_bytecode(asm, stmt.args[0], dreg+0, env)
+        to_bytecode(asm, stmt.args[1], dreg+1, env)
+        return asm.append(proxy.bcode('getitem', dreg))
+    elif stmt.name == 'setitem':
+        to_bytecode(asm, stmt.args[0], dreg+0, env)
+        to_bytecode(asm, stmt.args[1], dreg+1, env)
+        to_bytecode(asm, stmt.args[2], dreg+2, env)
+        return asm.append(proxy.bcode('setitem', dreg))
     raise Exception("cannot compile %r" % stmt)
 
 class Assembler(object):
@@ -259,21 +267,25 @@ def compile_sentence_toplevel(builder, snt):
         var = builder.function.get(snt[1].value)
         it  = builder.function.new_var()
         builder.append(Move(it, Iter(compile_expression(builder, snt[3]))))
+        builder.loops.append((loop, exit))
         builder.goto(loop, loop)
         builder.append(Move(var, Next(it, exit)))
         for node in snt[4]:
             compile_sentence_toplevel(builder, node)
         builder.goto(loop, exit)
+        builder.loops.pop(-1)
         return
     if symbole(snt[0], 'once') and symbole(snt[2], 'in'):
         exit = builder.new_block()
+        otherwise = builder.new_block()
         var = builder.function.get(snt[1].value)
         it  = builder.function.new_var()
         builder.append(Move(it, Iter(compile_expression(builder, snt[3]))))
         builder.append(Move(var, Next(it, exit)))
         for node in snt[4]:
             compile_sentence_toplevel(builder, node)
-        builder.goto(exit, exit)
+        builder.goto(exit, otherwise)
+        builder.otherwise_exit = exit
         return
     if len(builder.loops) > 0 and symbole(snt[0], 'continue'):
         builder.goto(builder.loops[-1][0], None)
@@ -366,6 +378,10 @@ def compile_expression(builder, expr):
         subject, name = expr
         subject = compile_expression(builder, subject)
         return Operation('getattr', [subject, builder.const(name.value)])
+    if expr.group == 'index':
+        subject = compile_expression(builder, expr[0])
+        index   = compile_expression(builder, expr[1])
+        return Operation('getitem', [subject, index])
     raise Exception("%s: cannot compile %r" % (parser.linecol(expr.location), expr))
 
 
