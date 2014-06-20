@@ -85,3 +85,13 @@ Overall programming is combination of three things:
  * Share/Sell things
 
 My language design is supposed to cover all three, not just the beef in the middle.
+
+## Participate
+
+To participate, you need to communicate with me, the author of this project. You can [file an issue][issues], or send me a private message in IRC (irc.freenode.net nick: Cheery), You may also throw an [email to Henri Tuhola <henri.tuhola@gmail.com>](mailto:henri.tuhola@gmail.com).
+
+Start by telling about what you've done before, what would you like to do, what you would have to know to participate. Whether you've managed to read and study at the C source code in the runtime directory.
+
+I will map out the status of the project in the [github issues list][issues], so you will know where we are going.
+
+ [issues]: https://github.com/cheery/language/issues
