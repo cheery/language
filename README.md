@@ -58,7 +58,7 @@ The module format will be specified, and one will expect certain stability from 
 
 ## VM
 
-Instruction format will be imitated from luajit, that is op:a:d and op:a:b:c, always encoded in little endian. The opcodes of the mnemonics will be in alphabetic order, so decoding will only require knowing the used virtual instruction set.
+Instruction format will be imitated from luajit, that is `op:a:d` and `op:a:b:c`, always encoded in little endian. The opcodes of the mnemonics will be in alphabetic order, so decoding will only require knowing the used virtual instruction set.
 
 The language will be copying garbage collected. Still studying how to implement eq hash tables. Perhaps with a rehash on hash table lookup failure.
 
