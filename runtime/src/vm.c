@@ -193,6 +193,7 @@ void vm_loop(vm_context* ctx)
         &&op_iter,     // 22
         &&op_next,
         &&op_nextc,
+        &&op_ge,
         &&op_eq,
         &&op_getitem,
     };
@@ -354,6 +355,16 @@ op_gt: /* gt dst src src */
     if (vm_unbox_tag(base[b]) == vm_unbox_tag(base[c]) && vm_tag_double == vm_unbox_tag(base[c]))
     {
         base[a] = vm_box_boolean(vm_unbox_double(base[b]) > vm_unbox_double(base[c]));
+    } else
+    {
+        VM_STUB();
+    }
+    goto next;
+op_ge: /* ge dst src src */
+    //base[a] = base[b] > base[c]
+    if (vm_unbox_tag(base[b]) == vm_unbox_tag(base[c]) && vm_tag_double == vm_unbox_tag(base[c]))
+    {
+        base[a] = vm_box_boolean(vm_unbox_double(base[b]) >= vm_unbox_double(base[c]));
     } else
     {
         VM_STUB();

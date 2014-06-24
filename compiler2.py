@@ -104,7 +104,7 @@ def to_bytecode(asm, stmt, dreg, env):
         if stmt.dst in vtable:
             return asm.append(proxy.bcode('move', vtable.index(stmt.dst), dreg))
         else:
-            return asm.append(proxy.bcode('setupval', dreg, utable.index(stmt.dst)))
+            return asm.append(proxy.bcode('setupval', dreg, utable.index(stmt.dst.value)))
     elif isinstance(stmt, Iter):
         to_bytecode(asm, stmt.src, dreg, env)
         return asm.append(proxy.bcode('iter', dreg, dreg))
@@ -209,6 +209,10 @@ def compile_sentence_toplevel(builder, snt):
         variable = builder.function.get(snt[1].value)
         builder.append(Move(variable, compile_sentence(builder, snt[2])))
         return
+    if snt.group == 'infix' and snt[0].value == ':=' and snt[1].group == 'symbol':
+        variable = builder.function.lookup(snt[1].value)
+        builder.append(Move(variable, compile_sentence(builder, snt[2])))
+        return
     if snt.group == 'infix' and snt[0].value == '=' and snt[1].group == 'attribute':
         subject = compile_expression(builder, snt[1][0])
         attr    = builder.const(snt[1][1].value)
@@ -281,7 +285,7 @@ def compile_sentence_toplevel(builder, snt):
         var = builder.function.get(snt[1].value)
         it  = builder.function.new_var()
         builder.append(Move(it, Iter(compile_expression(builder, snt[3]))))
-        builder.append(Move(var, Next(it, exit)))
+        builder.append(Move(var, Next(it, otherwise)))
         for node in snt[4]:
             compile_sentence_toplevel(builder, node)
         builder.goto(exit, otherwise)
@@ -567,6 +571,7 @@ class Variable(object):
         self.function = function
         self.name = name
         self.upvalue = False
+        self.value = self
 
     def __repr__(self):
         return self.name
