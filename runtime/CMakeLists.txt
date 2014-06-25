@@ -18,6 +18,7 @@ SET(AMBROSIA_SRC
     src/dict.c
     src/greenlet.c
     src/list.c
+    src/module.c
     src/stack.c
     src/string.c
     src/type.c
