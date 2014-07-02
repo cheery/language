@@ -1,4 +1,4 @@
-typedef struct vm_descriptor vm_descriptor;
+/*typedef struct vm_descriptor vm_descriptor;
 typedef struct vm_closure    vm_closure;
 
 extern vm_typespec vm_descriptor_type;
@@ -23,19 +23,20 @@ struct vm_closure
     vm_object object;
     vm_descriptor* desc;
     vm_value* upvalues[];
-};
+};*/
 
 vm_descriptor* vm_new_descriptor(
-        size_t argc,
-        size_t valc,
-        size_t upvalc,
-        size_t upcopyc,
-        size_t size,
-        uint16_t* upcopy,
-        uint8_t* program,
-        vm_value functions,
-        vm_value constants);
+        vm_context     *ctx,
+        int             flags,
+        size_t          argc,
+        size_t          valc,
+        size_t          nupvalc,
+        vm_arraybuffer *upcopy,
+        vm_arraybuffer *program,
+        vm_list        *functions,
+        vm_list        *constants);
 
-vm_closure* vm_new_closure(
-        vm_descriptor* desc,
-        vm_value** upvalues);
+/*
+ * The context must be in a desirable state for the descriptor.
+ */
+vm_closure* vm_new_closure(vm_context *ctx, vm_descriptor *desc);

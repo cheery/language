@@ -1,99 +1,62 @@
-#include <stdint.h>
-#include <stdlib.h>
-#include "api.h"
-#include "cmp.h"
+#include "vm.h"
 
-typedef struct
-{
-    vm_value key;
-    vm_value value;
-} vm_dict_entry;
-
-typedef struct
-{
-    vm_object object;
-    size_t size;
-    size_t length;
-    vm_dict_entry *entries;
-} vm_dict;
-
-size_t   vm_dict_sizeof()
-{
-    return sizeof(vm_dict);
-}
-
-static vm_value dict_factory()
-{
-    
-    return vm_box_object(0);
-}
-vm_typespec vm_dict_type = {sizeof(vm_dict), 0, dict_factory};
-
-vm_value vm_dict_init(void* address)
+vm_dict* vm_new_dict(vm_context *ctx, vm_val interface)
 {
     vm_dict *dict;
 
-    dict = address;
-    dict->size   = 0;
-    dict->length = 0;
-    dict->entries = NULL;
-    return vm_box_object(dict);
+    dict = gc_new(ctx, sizeof(vm_dict), vm_t_dict, interface);
+    dict->array.used = 0;
+    dict->array.size = 0;
+    dict->array.vals = NULL;
+    return dict;
 }
 
-vm_value vm_new_dict()
+size_t vm_dict_length(vm_context *ctx, vm_dict *dict)
 {
-    vm_dict* dict;
-
-    dict = vm_instantiate(&vm_dict_type, 0);
-    return vm_dict_init(dict);
+    return dict->array.used / 2;
 }
 
-size_t   vm_dict_length(vm_value dict)
-{
-    return ((vm_dict*)vm_unbox_object(dict))->length;
-}
+//typedef struct
+//{
+//    vm_object     object;
+//    vm_val_array  array;
+//} vm_dict;
 
-int vm_dict_getitem(vm_value object, vm_value key, vm_value* item)
+int vm_dict_getitem(vm_context *ctx, vm_dict *dict, vm_val key, vm_val *item)
 {
-    vm_dict* dict;
     int i;
 
-    dict = vm_unbox_object(object);
-
-    for (i = 0; i < dict->length; i++)
+    for (i = 0; i < dict->array.used; i+=2)
     {
-        if (vm_cmp(dict->entries[i].key, key) == 0)
+        if (vm_cmp(ctx, dict->array.vals[i+0], key) == 0)
         {
-            *item = dict->entries[i].value;
+            *item = dict->array.vals[i+1];
             return 1;
         }
     }
-    *item = vm_box_object(0);
+    *item = vm_null;
     return 0;
 }
 
-void     vm_dict_setitem(vm_value object, vm_value key, vm_value item)
+void vm_dict_setitem(vm_context *ctx, vm_dict *dict, vm_val key, vm_val item)
 {
-    vm_dict* dict;
     int i;
 
-    dict = vm_unbox_object(object);
-
-    for (i = 0; i < dict->length; i++)
+    for (i = 0; i < dict->array.used; i+=2)
     {
-        if (vm_cmp(dict->entries[i].key, key) == 0)
+        if (vm_cmp(ctx, dict->array.vals[i], key) == 0)
         {
-            dict->entries[i].value = item;
+            gc_barrier_val(ctx, dict, dict->array.vals[i+1] = item);
             return;
         }
     }
 
-    if (dict->length >= dict->size)
+    if (dict->array.used >= dict->array.size)
     {
-        dict->size = dict->size*2 + 8;
-        dict->entries = realloc(dict->entries, sizeof(vm_dict_entry)*dict->size);
+        dict->array.size = dict->array.size*2 + 8;
+        dict->array.vals = gc_realloc(ctx, dict->array.vals, sizeof(vm_val)*dict->array.size);
     }
-    dict->entries[dict->length].key   = key;
-    dict->entries[dict->length].value = item;
-    dict->length++;
+    gc_barrier_val(ctx, dict, dict->array.vals[dict->array.used+0] = key);
+    gc_barrier_val(ctx, dict, dict->array.vals[dict->array.used+1] = item);
+    dict->array.used+=2;
 }

@@ -1,67 +1,41 @@
-#include <stdlib.h>
-#include <string.h>
-#include "api.h"
-
-static vm_value descriptor_factory()
-{
-    vm_value type;
-    
-    type = vm_new_type();
-    return type;
-}
-
-vm_typespec vm_descriptor_type = {sizeof(vm_descriptor), 0, descriptor_factory};
-
-static vm_value closure_factory()
-{
-    vm_value type;
-    
-    type = vm_new_type();
-    return type;
-}
-
-vm_typespec vm_closure_type = {sizeof(vm_closure), 0, closure_factory};
+#include "vm.h"
 
 vm_descriptor* vm_new_descriptor(
-        size_t argc,
-        size_t valc,
-        size_t upvalc,
-        size_t upcopyc,
-        size_t size,
-        uint16_t* upcopy,
-        uint8_t* program,
-        vm_value functions,
-        vm_value constants)
+        vm_context     *ctx,
+        int             flags,
+        size_t          argc,
+        size_t          valc,
+        size_t          nupvalc,
+        vm_arraybuffer *upcopy,
+        vm_arraybuffer *program,
+        vm_list        *functions,
+        vm_list        *constants)
 {
-    vm_descriptor* desc;
+    vm_descriptor *desc;
 
-    desc = vm_instantiate(&vm_descriptor_type, 0);
-    desc->argc = argc;
-    desc->valc = valc;
-    desc->upvalc = upvalc;
-    desc->upcopyc = upcopyc;
-    desc->upcopy = realloc(NULL, sizeof(*upcopy) * upcopyc);
-    memcpy(desc->upcopy, upcopy, sizeof(*upcopy) * upcopyc);
-    desc->size = size;
-    desc->program = realloc(NULL, size);
-    memcpy(desc->program, program, size);
+    desc = gc_new(ctx, sizeof(vm_descriptor), vm_t_descriptor, interface_stub);
+    desc->argc      = argc;
+    desc->valc      = valc;
+    desc->nupvalc   = nupvalc;
+    desc->upcopy    = upcopy;
+    desc->program   = program;
     desc->functions = functions;
     desc->constants = constants;
     return desc;
 }
 
-vm_closure* vm_new_closure(
-        vm_descriptor* desc,
-        vm_value** upvalues)
+vm_closure* vm_new_closure(vm_context *ctx, vm_descriptor *desc)
 {
     vm_closure* closure;
-    int i;
+    size_t count = vm_arraybuffer_count(desc->upcopy, uint16_t);
 
-    closure = vm_instantiate(&vm_closure_type, sizeof(*upvalues) * desc->upcopyc);
-    closure->desc = desc;
-    for(i = 0; i < desc->upcopyc; i++)
+    if (count > 0)
     {
-        closure->upvalues[i] = upvalues[desc->upcopy[i]];
+        vm_panic(ctx);
     }
+
+    closure = gc_new(ctx, sizeof(vm_closure) + sizeof(vm_upval*)*count, vm_t_closure, interface_stub);
+    closure->desc  = desc;
+    closure->count = count;
     return closure;
 }

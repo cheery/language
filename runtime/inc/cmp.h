@@ -1,1 +1,1 @@
-int vm_cmp(vm_value a, vm_value b);
+int vm_cmp(vm_context *ctx, vm_val a, vm_val b);

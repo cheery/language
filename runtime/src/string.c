@@ -1,62 +1,31 @@
-#include <stdlib.h>
-#include "api.h"
+#include "vm.h"
+#include <string.h>
 
-typedef struct 
+vm_string* vm_new_cstring(vm_context *ctx, const char* string)
 {
-    vm_object object;
-    vm_value  string;
-    size_t    index;
-} vm_string_iterator;
+    return vm_new_string(ctx, strlen(string), string);
+}
 
-static vm_value string_iterator_factory();
-vm_typespec vm_string_iterator_type = {sizeof(vm_string_iterator), 0, string_iterator_factory};
-
-static void string_iterator_next(vm_context* ctx)
+vm_string* vm_new_string(vm_context *ctx, size_t length, const char* data)
 {
-    vm_string_iterator* iterator;
-    char* string;
-    size_t length;
+    vm_string* string;
 
-    iterator = vm_get_self_object(ctx, &vm_string_iterator_type);
-    length = vm_string_length(iterator->string);
-    string = vm_unbox_string(iterator->string);
-    if (iterator->index < length)
+    string = gc_new(ctx, sizeof(vm_string) + length + 1, vm_t_string, interface_stub);
+    string->length = length;
+    memcpy(string->data, data, length);
+    string->data[length] = 0;
+    return string;
+}
+
+vm_arraybuffer* vm_new_arraybuffer(vm_context *ctx, size_t length, const uint8_t* data)
+{
+    vm_arraybuffer* buffer;
+   
+    buffer = gc_new(ctx, sizeof(vm_arraybuffer) + length, vm_t_arraybuffer, interface_stub);
+    buffer->length = length;
+    if (data)
     {
-        vm_return_value(ctx, vm_box_string(1, &string[iterator->index++]));
+        memcpy(buffer->data, data, length);
     }
-    else
-    {
-        vm_stopiteration(ctx);
-    }
+    return buffer;
 }
-
-static vm_value string_iterator_factory()
-{
-    vm_value type;
-
-    type = vm_new_type();
-    vm_type_method(type, "next", string_iterator_next);
-    return type;
-}
-
-static void new_iterator(vm_context* ctx)
-{
-    vm_string_iterator* iterator;
-
-    iterator = vm_instantiate(&vm_string_iterator_type, 0);
-    vm_get_self_object(ctx, &vm_string_type);
-    iterator->string = vm_get_self(ctx);
-    iterator->index  = 0;
-    vm_return_value(ctx, vm_box_object(iterator));
-}
-
-static vm_value string_factory()
-{
-    vm_value type;
-
-    type = vm_new_type();
-    vm_type_method(type, "+iter", new_iterator);
-    return type;
-}
-
-vm_typespec vm_string_type = {0, 0, string_factory};

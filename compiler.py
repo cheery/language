@@ -2,7 +2,8 @@
 import argparse
 import parser
 #import runtime
-import proxy
+#import proxy
+import asmod, mod, os
 
 def main():
     argparser = argparse.ArgumentParser(description="Compile file to bytecode")
@@ -14,28 +15,36 @@ def main():
 
     gktable = function.nonlocals.values()
     gktable.extend(const.values())
-    gk = list()
+
+    constants = mod.Constants.empty()
+    #gk = list()
     #gk = (runtime.Value*len(gktable))()
     for i, item in enumerate(gktable):
         if isinstance(item, Value):
-            if isinstance(item.value, (unicode, str)):
-                s = item.value.encode('utf-8')
-                gk.append( proxy.box_cstring(s) )
-            elif isinstance(item.value, (int, long, float)):
-                gk.append( proxy.box_double(item.value) )
-            else:
-                raise Exception("um? %r" % item.value)
+            constants.val(item.value)
+#            if isinstance(item.value, (unicode, str)):
+#                s = item.value.encode('utf-8')
+#                gk.append( proxy.box_cstring(s) )
+#            elif isinstance(item.value, (int, long, float)):
+#                gk.append( proxy.box_double(item.value) )
+#            else:
+#                raise Exception("um? %r" % item.value)
         else:
-            gk.append( proxy.get_global(item.name) )
+            constants.glob(item.name)
+            #gk.append( proxy.get_global(item.name) )
+    constants.frozen = True
 
     #print gktable
-    descriptor = compile_closure(function, gktable, gk, [])
-    proxy.run_toplevel(descriptor)
+    descriptor = compile_closure(function, gktable, constants, [])
+    outfile = os.path.splitext(args.filename)[0] + '.o'
+    asmod.writeout(outfile, args.filename, constants, descriptor)
+
+    #proxy.run_toplevel(descriptor)
     #cl = runtime.newClosure(cld, None)
     #runtime.callClosure(cl, 0, None)
     # argc, upvalc, [uctable], [gktable], [ftable]
 
-def compile_closure(function, gktable, gk, uvtable):
+def compile_closure(function, gktable, constants, uvtable):
     uctable = []
     vtable = function.argvar
     utable = []
@@ -52,11 +61,11 @@ def compile_closure(function, gktable, gk, uvtable):
         if variable.upvalue:
             utable.append(variable)
             if variable in vtable:
-                asm.append( proxy.bcode("setupval", vtable.index(variable), utable.index(variable)) )
+                asm.append( mod.bcode("setupval", vtable.index(variable), utable.index(variable)) )
                 #        runtime.abc("SETUPVAL", utable.index(variable), vtable.index(variable)) )
         elif variable not in vtable:
             vtable.append(variable)
-    env = [vtable, utable, gktable, ftable, len(vtable)]
+    env = [vtable, utable, constants, ftable, len(vtable)]
     tmp_regs = env[4]
     for block in function.blocks:
         asm.label(block)
@@ -64,13 +73,16 @@ def compile_closure(function, gktable, gk, uvtable):
             to_bytecode(asm, stmt, tmp_regs, env)
     asm.link()
 
-    ftab = []
+    functions = []
     for func in ftable:
-        ftab.append(proxy.box_object(compile_closure(func, gktable, gk, utable)))
+        functions.append(compile_closure(func, gktable, constants, utable))
+#        fta
+#        ftab.append(proxy.box_object(compile_closure(func, gktable, gk, utable)))
 
     #print "new closures", ftab, vtable
     bytecode = ''.join(asm.code)
-    return proxy.build_descriptor(len(function.argvar), env[4], len(utable), uctable, bytecode, ftab, gk)
+    return mod.Desc(0, env[4], len(function.argvar), len(utable) - len(uctable), uctable, bytecode, [], functions)
+    #return proxy.build_descriptor(len(function.argvar), env[4], len(utable), uctable, bytecode, ftab, gk)
     #return runtime.buildClosureDef(env[4], len(function.argvar), len(utable), uctable, gk, ftab, bytecode)
 
 #    vt = (runtime.Value*env[4])()
@@ -89,78 +101,78 @@ binops = {
 }
 
 def to_bytecode(asm, stmt, dreg, env):
-    vtable, utable, gktable, ftable, breg = env
+    vtable, utable, constants, ftable, breg = env
     env[4] = max(breg, dreg+1)
     if isinstance(stmt, NonLocal):
         p = stmt.value
-        if p in gktable:
-            return asm.append(proxy.bcode('getconst', dreg, gktable.index(p)))
+        if p.name in constants:
+            return asm.append(mod.bcode('getconst', dreg, constants.glob(p.name)))
         else:
-            return asm.append(proxy.bcode('getupval', dreg, utable.index(p)))
+            return asm.append(mod.bcode('getupval', dreg, utable.index(p)))
     elif isinstance(stmt, Value):
-        return asm.append(proxy.bcode('getconst', dreg, gktable.index(stmt)))
+        return asm.append(mod.bcode('getconst', dreg, constants.val(stmt.value)))
     elif isinstance(stmt, Move):
         to_bytecode(asm, stmt.src, dreg, env)
         if stmt.dst in vtable:
-            return asm.append(proxy.bcode('move', vtable.index(stmt.dst), dreg))
+            return asm.append(mod.bcode('move', vtable.index(stmt.dst), dreg))
         else:
-            return asm.append(proxy.bcode('setupval', dreg, utable.index(stmt.dst.value)))
+            return asm.append(mod.bcode('setupval', dreg, utable.index(stmt.dst.value)))
     elif isinstance(stmt, Iter):
         to_bytecode(asm, stmt.src, dreg, env)
-        return asm.append(proxy.bcode('iter', dreg, dreg))
+        return asm.append(mod.bcode('iter', dreg, dreg))
     elif isinstance(stmt, Variable):
         if stmt in vtable:
-            return asm.append(proxy.bcode('move', dreg, vtable.index(stmt)))
+            return asm.append(mod.bcode('move', dreg, vtable.index(stmt)))
         else:
-            return asm.append(proxy.bcode('getupval', dreg, utable.index(stmt)))
+            return asm.append(mod.bcode('getupval', dreg, utable.index(stmt)))
     elif isinstance(stmt, Test):
         to_bytecode(asm, stmt.cond, dreg, env)
         if stmt.inverse:
-            return asm.append(proxy.bcode('testn', dreg, 0), link=stmt.then)
+            return asm.append(mod.bcode('testn', dreg, 0), link=stmt.then)
         else:
-            return asm.append(proxy.bcode('test',  dreg, 0), link=stmt.then)
+            return asm.append(mod.bcode('test',  dreg, 0), link=stmt.then)
     elif isinstance(stmt, Jump):
-        return asm.append(proxy.bcode('jump', stmt.drop, 0), link=stmt.then)
+        return asm.append(mod.bcode('jump', stmt.drop, 0), link=stmt.then)
     elif isinstance(stmt, Return):
         to_bytecode(asm, stmt.value, dreg, env)
-        return asm.append(proxy.bcode('return', dreg, 1))
+        return asm.append(mod.bcode('return', dreg, 1))
     elif isinstance(stmt, Function):
-        return asm.append(proxy.bcode('closure', dreg, ftable.index(stmt)))
+        return asm.append(mod.bcode('closure', dreg, ftable.index(stmt)))
     elif isinstance(stmt, Try):
         if stmt.exc != None:
-            asm.append(proxy.bcode('except', 0, 0), link=stmt.exc)
+            asm.append(mod.bcode('except', 0, 0), link=stmt.exc)
         return
     elif isinstance(stmt, Next):
-        asm.append(proxy.bcode('next', dreg, vtable.index(stmt.it)))
-        asm.append(proxy.bcode('nextc', 0, 0), link=stmt.stop)
+        asm.append(mod.bcode('next', dreg, vtable.index(stmt.it)))
+        asm.append(mod.bcode('nextc', 0, 0), link=stmt.stop)
         return
     elif stmt is True:
-        return asm.append(proxy.bcode('loadbool', dreg, 1))
+        return asm.append(mod.bcode('loadbool', dreg, 1))
     elif stmt is False:
-        return asm.append(proxy.bcode('loadbool', dreg, 0))
+        return asm.append(mod.bcode('loadbool', dreg, 0))
     elif stmt is None:
-        return asm.append(proxy.bcode('loadnull', dreg, 1))
+        return asm.append(mod.bcode('loadnull', dreg, 1))
     elif stmt.name == 'loop':
-        return asm.append(proxy.bcode('loop'))
+        return asm.append(mod.bcode('loop'))
     elif stmt.name == 'call':
         for i, expr in enumerate(stmt.args):
             to_bytecode(asm, expr, dreg+i, env)
-        return asm.append(proxy.bcode('call', dreg, dreg+len(stmt.args)))
+        return asm.append(mod.bcode('call', dreg, dreg+len(stmt.args)))
     elif stmt.name == 'getattr':
         to_bytecode(asm, stmt.args[0], dreg+0, env)
         to_bytecode(asm, stmt.args[1], dreg+1, env)
-        return asm.append(proxy.bcode('getattr', dreg))
+        return asm.append(mod.bcode('getattr', dreg))
     elif stmt.name == 'callattr':
         argc = len(stmt.args) - 1
         to_bytecode(asm, stmt.args[0], dreg+argc, env)
         for i, expr in enumerate(stmt.args[1:]):
             to_bytecode(asm, expr, dreg+i, env)
-        return asm.append(proxy.bcode('callattr', dreg+argc, dreg, dreg+argc))
+        return asm.append(mod.bcode('callattr', dreg+argc, dreg, dreg+argc))
     elif stmt.name == 'setattr':
         to_bytecode(asm, stmt.args[0], dreg+0, env)
         to_bytecode(asm, stmt.args[1], dreg+1, env)
         to_bytecode(asm, stmt.args[2], dreg+2, env)
-        return asm.append(proxy.bcode('setattr', dreg))
+        return asm.append(mod.bcode('setattr', dreg))
     elif stmt.name in binops:
         name = binops[stmt.name]
         i = 0
@@ -172,16 +184,16 @@ def to_bytecode(asm, stmt, dreg, env):
                 to_bytecode(asm, arg, dreg+i, env)
                 args.append(dreg+i)
                 i+=1
-        return asm.append(proxy.bcode(name, dreg, *args))
+        return asm.append(mod.bcode(name, dreg, *args))
     elif stmt.name == 'getitem':
         to_bytecode(asm, stmt.args[0], dreg+0, env)
         to_bytecode(asm, stmt.args[1], dreg+1, env)
-        return asm.append(proxy.bcode('getitem', dreg))
+        return asm.append(mod.bcode('getitem', dreg))
     elif stmt.name == 'setitem':
         to_bytecode(asm, stmt.args[0], dreg+0, env)
         to_bytecode(asm, stmt.args[1], dreg+1, env)
         to_bytecode(asm, stmt.args[2], dreg+2, env)
-        return asm.append(proxy.bcode('setitem', dreg))
+        return asm.append(mod.bcode('setitem', dreg))
     raise Exception("cannot compile %r" % stmt)
 
 class Assembler(object):
@@ -202,7 +214,7 @@ class Assembler(object):
     def link(self):
         for loc, target in self.links:
             to = self.labels[target]
-            self.code[loc] = proxy.bcode_adjust(self.code[loc], ((to - loc - 1) * 4) + 0x8000)
+            self.code[loc] = mod.bcode_adjust(self.code[loc], ((to - loc - 1) * 4) + 0x8000)
 
 def compile_sentence_toplevel(builder, snt):
     if snt.group == 'infix' and snt[0].value == '=' and snt[1].group == 'symbol':

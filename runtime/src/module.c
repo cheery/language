@@ -1,47 +1,41 @@
-#include <error.h>
-#include <errno.h>
-#include <stdint.h>
+#include "vm.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdlib.h>
+#include <error.h>
+#include <errno.h>
 #include <stdio.h>
-#include "api.h"
 
 typedef struct
 {
-    int index;
-    int size;
+    size_t index;
+    size_t size;
     uint8_t* buffer;
-} vm_mini_stream;
-
-typedef union
-{
-    int64_t integer;
-    double  number;
-} vm_intnum;
+} mini_stream;
 
 const uint8_t identver[] = "\x89" "Ambrosia Module\r\n\x1a\n\xff\xff";
 
-vm_value read_descriptor(vm_mini_stream *stream, vm_value constants);
-vm_value read_string(vm_mini_stream *stream);
-vm_value read_bytes(vm_mini_stream *stream);
-int read_ushort(vm_mini_stream *stream);
-int read_short(vm_mini_stream *stream);
-uint32_t read_uint(vm_mini_stream *stream);
-int64_t read_integer(vm_mini_stream *stream);
-double read_double(vm_mini_stream *stream);
-int read_byte(vm_mini_stream *stream);
+vm_descriptor* read_descriptor(vm_context *ctx, mini_stream *stream, vm_list *constants);
+vm_string* read_string(vm_context *ctx, mini_stream *stream);
+int      read_ushort(mini_stream *stream);
+int      read_short(mini_stream *stream);
+uint32_t read_uint(mini_stream *stream);
+int64_t  read_integer(mini_stream *stream);
+double   read_double(mini_stream *stream);
+int      read_byte(mini_stream *stream);
 
-vm_value open_module(const char* path)
+vm_descriptor* vm_module_load(vm_context *ctx, vm_path *path, vm_dict *baselib, vm_dict *names)
 {
     int fd;
     struct stat stat;
-    size_t size;
-    int i, length;
+    size_t i, length;
+    mini_stream _stream;
+    mini_stream *stream = &_stream;
+    vm_list *constants;
+    vm_val name, value;
 
-    fd = open(path, O_RDONLY);
+    fd = open(vm_path_cpath(ctx, path)->data, O_RDONLY);
     if (fd < 0)
     {
         error(1, errno, "cannot open module");
@@ -50,15 +44,15 @@ vm_value open_module(const char* path)
     {
         error(1, errno, "cannot stat module");
     }
-    size = stat.st_size;
-
-    uint8_t buffer[size];
-    if (read(fd, buffer, size) != size)
+    uint8_t buffer[stat.st_size];
+    stream->size   = stat.st_size;
+    stream->buffer = buffer;
+    printf("size = %li\n", stat.st_size);
+    if (read(fd, stream->buffer, stream->size) != stream->size)
     {
         error(1, errno, "cannot read module");
     }
-
-    if (size < sizeof(identver) - 1)
+    if (stream->size < sizeof(identver) - 1)
     {
         error(1, 0, "not a module file (too small)");
     }
@@ -66,103 +60,96 @@ vm_value open_module(const char* path)
     {
         if (identver[i] != buffer[i])
         {
-            error(1, 0, "not a module file %i: %i != %i", i, identver[i], buffer[i]);
+            error(1, 0, "not a module file %li: %i != %i", i, identver[i], buffer[i]);
         }
     }
+    stream->index = sizeof(identver) - 1;
+    //read_string(ctx, stream); // source =
+    constants = vm_new_list(ctx, interface_stub);
 
-    vm_mini_stream _stream = {sizeof(identver) - 1, size, buffer};
-    vm_mini_stream *stream = &_stream;
-
-    //vm_value source;
-    vm_value constants;
-    vm_value baselib;
-    vm_value name;
-    vm_value value;
-    vm_value descriptor;
-
-    read_string(stream); //source    = read_string(stream);
-    baselib   = vm_init();
-    constants = vm_new_list();
-
-    // globs
     length = read_ushort(stream);
-    printf("globs %i\n", length);
+    printf("globs count: %li\n", length);
+    // globs
     for (i = 0; i < length; i++)
     {
-        name = read_string(stream);
-        if (0 == vm_dict_getitem(baselib, name, &value))
+        name = vm_box(ctx, read_string(ctx, stream));
+        if (0 == vm_dict_getitem(ctx, baselib, name, &value))
         {
-            error(1, 0, "%s not in baselib\n", vm_unbox_string(name));
+            error(1, 0, "%s not in baselib\n", ((vm_string*)vm_unbox(ctx, name, vm_t_string))->data);
         }
-        vm_list_append(constants, value);
+        vm_list_append(ctx, constants, value);
     }
     // integers
-    printf("integers %i\n", length);
     length = read_ushort(stream);
+    printf("integers count: %li\n", length);
     for (i = 0; i < length; i++)
     {
-        value = vm_box_integer(read_integer(stream));
-        vm_list_append(constants, value);
+        value = vm_box_integer(ctx, read_integer(stream));
+        vm_list_append(ctx, constants, value);
     }
 
     // floats
     length = read_ushort(stream);
-    printf("floats %i\n", length);
+    printf("floats count: %li\n", length);
     for (i = 0; i < length; i++)
     {
-        value = vm_box_double(read_double(stream));
-        vm_list_append(constants, value);
+        value = vm_box_double(ctx, read_double(stream));
+        vm_list_append(ctx, constants, value);
     }
     // strings
-    printf("strings %i\n", length);
+    printf("strings count: %li\n", length);
     length = read_ushort(stream);
     for (i = 0; i < length; i++)
     {
-        value = read_string(stream);
-        vm_list_append(constants, value);
+        value = vm_box(ctx, read_string(ctx, stream));
+        vm_list_append(ctx, constants, value);
     }
-    
-    descriptor = read_descriptor(stream, constants);
-    return descriptor;
+    return read_descriptor(ctx, stream, constants);
 }
 
-vm_value read_descriptor(vm_mini_stream *stream, vm_value constants)
+vm_descriptor* read_descriptor(vm_context *ctx, mini_stream *stream, vm_list *constants)
 {
-    int valc, argc, upvalc, upcopyc, size, locs, descs;
+    int flags, valc, argc, nupvalc, upcopyc, size, locs, descs;
     int i;
-    uint8_t* program;
+    vm_arraybuffer *upcopy;
+    vm_arraybuffer *program;
+    vm_list        *functions;
 
+    flags = read_ushort(stream);
     valc = read_ushort(stream);
-    argc = read_short(stream);
-    upvalc = read_ushort(stream);
+    argc = read_ushort(stream);
+    nupvalc = read_ushort(stream);
+
     upcopyc = read_ushort(stream);
-    printf("valc=%i, argc=%i, upvalc=%i, upcopyc=%i\n", valc, argc, upvalc, upcopyc);
-    uint16_t upcopy[upcopyc];
+    upcopy = vm_new_arraybuffer(ctx, upcopyc, NULL);
+    uint16_t *n = (uint16_t*)upcopy->data;
     for (i = 0; i < upcopyc; i++)
     {
-        upcopy[i] = read_ushort(stream);
+        n[i] = read_ushort(stream);
     }
-    size = read_ushort(stream);
-    program = &stream->buffer[stream->index];
-    stream->index += size;
-    locs = read_ushort(stream);
 
+    printf("valc=%i, argc=%i, nupvalc=%i, upcopyc=%i\n", valc, argc, nupvalc, upcopyc);
+    size = read_ushort(stream); 
+    program = vm_new_arraybuffer(ctx, size, &stream->buffer[stream->index]);
+    stream->index += size;
+
+    locs = read_ushort(stream);
     for (i = 0; i < locs; i++)
     {
         read_uint(stream); // skip for now..
     }
 
-    vm_value functions = vm_new_list();
+    functions = vm_new_list(ctx, interface_stub);
 
     descs = read_ushort(stream);
     for (i = 0; i < descs; i++)
     {
-        vm_list_append(functions, read_descriptor(stream, constants));
+        vm_list_append(ctx, functions, vm_box(ctx, read_descriptor(ctx, stream, constants)));
     }
-    return vm_box_object(vm_new_descriptor(argc, valc, upvalc, upcopyc, size, upcopy, program, functions, constants));
+    return vm_new_descriptor(ctx, flags, argc, valc, nupvalc, upcopy, program, functions, constants);
 }
 
-vm_value read_string(vm_mini_stream *stream)
+vm_string* read_string(vm_context *ctx, mini_stream *stream)
 {
     int length;
     char* data;
@@ -170,10 +157,11 @@ vm_value read_string(vm_mini_stream *stream)
     length = read_ushort(stream);
     data = (char*)&stream->buffer[stream->index];
     stream->index += length;
-    return vm_box_string(length, data);
+    //printf("length: %i\n", length);
+    return vm_new_string(ctx, length, data);
 }
 
-int read_ushort(vm_mini_stream *stream)
+int read_ushort(mini_stream *stream)
 {
     int value = 0;
     value |= read_byte(stream) << 0;
@@ -181,7 +169,7 @@ int read_ushort(vm_mini_stream *stream)
     return value;
 }
 
-int read_short(vm_mini_stream *stream)
+int read_short(mini_stream *stream)
 {
     int value = read_ushort(stream);
 
@@ -190,7 +178,7 @@ int read_short(vm_mini_stream *stream)
     return value;
 }
 
-uint32_t read_uint(vm_mini_stream *stream)
+uint32_t read_uint(mini_stream *stream)
 {
     int64_t value = 0;
     int i;
@@ -202,7 +190,7 @@ uint32_t read_uint(vm_mini_stream *stream)
     return value;
 }
 
-int64_t read_integer(vm_mini_stream *stream)
+int64_t read_integer(mini_stream *stream)
 {
     int64_t value = 0;
     int i;
@@ -214,16 +202,16 @@ int64_t read_integer(vm_mini_stream *stream)
     return value;
 }
 
-double read_double(vm_mini_stream *stream)
+double read_double(mini_stream *stream)
 {
-    vm_intnum intnum;
-
-    intnum.integer = read_integer(stream);
-    return intnum.number;
+    union { int64_t integer; double  number; } pun;
+    pun.integer = read_integer(stream);
+    return pun.number;
 }
 
-int read_byte(vm_mini_stream *stream)
+int read_byte(mini_stream *stream)
 { 
     if (stream->index >= stream->size) error(1, 0, "overflow during module read");
+    //printf("read single byte %i\n", stream->buffer[stream->index]);
     return stream->buffer[stream->index++];
 }

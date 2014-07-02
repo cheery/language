@@ -1,30 +1,32 @@
-#include <stdint.h>
-#include <stdlib.h>
-#include "value.h"
-#include "cmp.h"
+#include "vm.h"
 
-int vm_cmp(vm_value a, vm_value b)
+int vm_cmp(vm_context *ctx, vm_val a, vm_val b)
 {
-    vm_tag tag_a, tag_b;
+    vm_object_type type_a, type_b;
+
     size_t len_a, len_b, len;
-    char* astr;
-    char* bstr;
+    vm_string *as, *bs;
+    const char *astr;
+    const char *bstr;
     double anum, bnum;
     int i;
 
     if (a == b) return 0;
 
-    tag_a = vm_unbox_tag(a);
-    tag_b = vm_unbox_tag(b);
-    if (tag_a == tag_b) switch (tag_a)
+    type_a = vm_typeof(a);
+    type_b = vm_typeof(b);
+    if (type_a == type_b) switch (type_a)
     {
-        case vm_tag_string:
-            len_a = vm_string_length(a);
-            len_b = vm_string_length(b);
+        case vm_t_string:
+            as = vm_unbox(ctx, a, vm_t_string);
+            bs = vm_unbox(ctx, b, vm_t_string);
+                
+            len_a = as->length;
+            len_b = bs->length;
             len = (len_b < len_a)?len_b:len_a;
 
-            astr = vm_unbox_string(a);
-            bstr = vm_unbox_string(b);
+            astr = as->data;
+            bstr = bs->data;
             for(i = 0; i < len; i++)
             {
                 if (astr[i] < bstr[i])
@@ -48,9 +50,9 @@ int vm_cmp(vm_value a, vm_value b)
             {
                 return 0;
             }
-        case vm_tag_double:
-            anum = vm_unbox_double(a);
-            bnum = vm_unbox_double(b);
+        case vm_t_double:
+            anum = vm_unbox_double(ctx, a);
+            bnum = vm_unbox_double(ctx, b);
             if (anum < bnum)
             {
                 return -1;
