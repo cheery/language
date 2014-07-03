@@ -90,6 +90,11 @@ void* vm_unbox(vm_context *ctx, vm_val val, vm_object_type type)
     return (void*)valdata(val);
 }
 
+void* vm_unbox_object(vm_context *ctx, vm_val val)
+{
+    return (void*)valdata(val);
+}
+
 int vm_unbox_bool(vm_context *ctx, vm_val val)
 {
     if (val == tagdata(vm_t_constant, 0))

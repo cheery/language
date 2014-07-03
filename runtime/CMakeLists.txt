@@ -10,6 +10,8 @@ execute_process(
 )
 
 SET(AMBROSIA_SRC
+    src/baselib.c
+    src/builtin.c
     src/closure.c
     src/cmp.c
     src/dict.c

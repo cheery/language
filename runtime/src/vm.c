@@ -16,6 +16,7 @@ void vm_loop(vm_context* ctx)
         &&op_boolor,
         &&op_call,
         &&op_callvarg,
+        &&op_cat,
         &&op_closure,
         &&op_div,
         &&op_eq,
@@ -73,13 +74,47 @@ next:
     pc += 4;
     fprintf(stderr, "%i: op[%i](%i, %i, %i | %i)\n", (int)((pc - frame->clos->desc->program->data - 4) >> 2), op, a, b, c, d);
     goto *optable[op];
-op_add:
+op_add: /* add dst a b */
+    {
+        vm_object_type b_type, c_type;
+        b_type = vm_typeof(base[b]);
+        c_type = vm_typeof(base[c]);
+        if (b_type == vm_t_integer && c_type == vm_t_integer)
+        {
+            base[a] = vm_box_integer(ctx, vm_unbox_integer(ctx, base[b]) + vm_unbox_integer(ctx, base[c]));
+        }
+        else if (b_type == vm_t_double && c_type == vm_t_double)
+        {
+            base[a] = vm_box_double(ctx, vm_unbox_double(ctx, base[b]) + vm_unbox_double(ctx, base[c]));
+        }
+        else if (b_type == vm_t_integer && c_type == vm_t_double)
+        {
+            base[a] = vm_box_double(ctx, ((double)vm_unbox_integer(ctx, base[b])) + vm_unbox_double(ctx, base[c]));
+        }
+        else if (b_type == vm_t_double && c_type == vm_t_double)
+        {
+            base[a] = vm_box_double(ctx, vm_unbox_double(ctx, base[b]) + ((double)vm_unbox_integer(ctx, base[c])));
+        }
+        else
+        {
+            vm_panic(ctx);
+        }
+    }
+    goto next;
 op_and:
 op_booland:
 op_boolnot:
 op_boolor:
+    goto notimplemented;
 op_call:
+    frame->pc = pc - frame->clos->desc->program->data;
+    vm_stack_push(ctx, ctx->stack, frame->self, a, a, b-(a+1));
+    frame = vm_stack_current_frame(ctx, ctx->stack);
+    base  = vm_stack_current_base(ctx, ctx->stack);
+    pc    = frame->pc + frame->clos->desc->program->data;
+    goto next;
 op_callvarg:
+op_cat:
 op_closure:
 op_div:
 op_eq:
@@ -88,7 +123,10 @@ op_finally:
 op_floordiv:
 op_ge:
 op_getattr:
-op_getconst:
+    goto notimplemented;
+op_getconst: /* getconst dst const */
+    gc_barrier_val(ctx, ctx->stack, base[a] = vm_list_getitem(ctx, frame->clos->desc->constants, d));
+    goto next;
 op_getitem:
 op_getupval:
 op_gt:
@@ -128,14 +166,50 @@ op_or:
 op_pos:
 op_raise:
 op_reraise:
-op_return:
+    goto notimplemented;
+op_return: /* return src */
+    if (vm_stack_pop(ctx, ctx->stack, base[a]))
+    {
+        return;
+    }
+    frame = vm_stack_current_frame(ctx, ctx->stack);
+    base  = vm_stack_current_base(ctx, ctx->stack);
+    pc    = frame->pc + frame->clos->desc->program->data;
+    goto next;
 op_rshift:
 op_self:
 op_setattr:
 op_setconst:
 op_setitem:
 op_setupval:
-op_sub:
+    goto notimplemented;
+op_sub: /* sub dst b c */
+    {
+        vm_object_type b_type, c_type;
+        b_type = vm_typeof(base[b]);
+        c_type = vm_typeof(base[c]);
+        if (b_type == vm_t_integer && c_type == vm_t_integer)
+        {
+            base[a] = vm_box_integer(ctx, vm_unbox_integer(ctx, base[b]) - vm_unbox_integer(ctx, base[c]));
+        }
+        else if (b_type == vm_t_double && c_type == vm_t_double)
+        {
+            base[a] = vm_box_double(ctx, vm_unbox_double(ctx, base[b]) - vm_unbox_double(ctx, base[c]));
+        }
+        else if (b_type == vm_t_integer && c_type == vm_t_double)
+        {
+            base[a] = vm_box_double(ctx, ((double)vm_unbox_integer(ctx, base[b])) - vm_unbox_double(ctx, base[c]));
+        }
+        else if (b_type == vm_t_double && c_type == vm_t_double)
+        {
+            base[a] = vm_box_double(ctx, vm_unbox_double(ctx, base[b]) - ((double)vm_unbox_integer(ctx, base[c])));
+        }
+        else
+        {
+            vm_panic(ctx);
+        }
+    }
+    goto next;
 op_tailcall:
 op_tailcallvarg:
 op_test:
@@ -556,3 +630,4 @@ notimplemented:
 //     vm_getitem(ctx, a);
 //     goto next;
 // }
+//

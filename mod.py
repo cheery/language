@@ -1,4 +1,4 @@
-import json
+import json, os
 
 identification = '\x89Ambrosia Module\r\n\x1a\n'
 
@@ -69,7 +69,11 @@ class Desc(object):
     def empty(cls):
         return cls(0, 0, 0, 0, [], '', [], [])
 
-with open("build/ambrosia-bytecode.json") as fd:
+bytecode_path = os.path.join(
+    os.path.dirname(__file__),
+    "build/ambrosia-bytecode.json"
+)
+with open(bytecode_path) as fd:
     optable = json.load(fd)
 
 def bcode_abc(opcode, a=0, b=0, c=0):

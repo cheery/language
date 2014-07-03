@@ -74,8 +74,9 @@ vm_descriptor* vm_module_load(vm_context *ctx, vm_path *path, vm_dict *baselib, 
     {
         name = vm_box(ctx, read_string(ctx, stream));
         if (0 == vm_dict_getitem(ctx, baselib, name, &value))
+        if (0 == vm_dict_getitem(ctx, names, name, &value))
         {
-            error(1, 0, "%s not in baselib\n", ((vm_string*)vm_unbox(ctx, name, vm_t_string))->data);
+            error(1, 0, "%s not in scope\n", ((vm_string*)vm_unbox(ctx, name, vm_t_string))->data);
         }
         vm_list_append(ctx, constants, value);
     }

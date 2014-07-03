@@ -34,18 +34,50 @@ vm_stack* vm_new_stack(vm_context *ctx, vm_val self, int argc, vm_val *argv)
     return stack;
 }
 
-void vm_stack_push(vm_context *ctx, vm_stack *stack, vm_val self, int func, int argc)
+void vm_stack_push(vm_context *ctx, vm_stack *stack, vm_val self, int dst, int func, int argc)
 {
+    vm_builtin     *builtin;
     vm_closure     *clos;
     vm_descriptor  *desc;
     vm_frame       *frame;
     vm_object_type  type;
-    int i;
+    int i, base;
+
+    if(stack->frames.used > 0)
+    {
+        /* makes the func relative to the current base, if there is one.. makes things simpler. */
+        base = vm_stack_current_frame(ctx, stack)->base;
+        func += base;
+        dst  += base;
+    }
+    
+    if (ctx->stack != stack)
+    {
+        vm_panic(ctx);
+    }
 
     type = vm_typeof(stack->vals.vals[func]);
     if (type == vm_t_builtin)
     {
-        vm_panic(ctx);
+        builtin = vm_unbox(ctx, stack->vals.vals[func], vm_t_builtin);
+        frame   = push_frame(ctx, stack);
+        /* add C stack frame, then set 'return value' null. */
+        frame->clos = NULL;
+        frame->pc   = argc;
+        frame->dst  = dst;
+        frame->base = func + 1;
+        frame->top  = frame->base + argc;
+        stack->vals.vals[frame->dst] = vm_null;
+        builtin->func(ctx);
+        /* check if stack frame is still a C stack frame, in that case remove it. */
+        frame   = vm_stack_current_frame(ctx, stack);
+        if (frame->clos == NULL)
+        {
+            stack->frames.used--;
+        }
+        /* fit the previous frame into the stack, if it was cut */
+        frame   = vm_stack_current_frame(ctx, stack);
+        vals_cover(ctx, stack, frame->top);
     }
     else if (type == vm_t_closure)
     {
@@ -54,6 +86,7 @@ void vm_stack_push(vm_context *ctx, vm_stack *stack, vm_val self, int func, int 
         frame = push_frame(ctx, stack);
         gc_barrier(ctx, stack, frame->clos = clos);
         gc_barrier_val(ctx, stack, frame->self = self);
+        frame->dst  = dst;
         frame->base = func + 1;
         frame->top  = frame->base + desc->valc;
         frame->pc   = 0;
@@ -79,31 +112,38 @@ void vm_stack_push(vm_context *ctx, vm_stack *stack, vm_val self, int func, int 
     }
 }
 
-void vm_stack_pop(vm_context *ctx, vm_stack *stack, vm_val self, vm_val retval)
+int vm_stack_pop(vm_context *ctx, vm_stack *stack, vm_val retval)
 {
     vm_frame *frame;
     size_t frame_id;
 
-    vm_stack_current_base(ctx, stack)[-1] = retval;
     frame = vm_stack_current_frame(ctx, stack);
-    stack->vals.used = frame->base;
-    gc_realloc(ctx, frame->upvalues, 0);
-    frame_id = --stack->frames.used;
+    gc_barrier_val(ctx, stack, stack->vals.vals[frame->dst] = retval);
 
+    frame_id = --stack->frames.used;
     // drop the exceptions of the frame
     while(stack->excepts.used > 0 && stack->excepts.excepts[stack->excepts.used-1].frame == frame_id)
     {
         stack->excepts.used--;
     }
+    gc_realloc(ctx, frame->upvalues, 0);
 
     if (frame_id > 0)
     {
-        vm_panic(ctx);
+        frame = vm_stack_current_frame(ctx, stack);
+        vals_cover(ctx, stack, frame->top);
+        return 0;
+    }
+    else if (stack->parent == NULL && ctx->greenlet->parent == NULL)
+    {
+        return 1;
     }
     else
     {
         vm_panic(ctx);
+        return 1;
     }
+
 }
 
 void vm_stack_resume(vm_context *ctx, vm_stack *stack, int argc, vm_val *argv)
@@ -142,7 +182,7 @@ void vm_stack_resume(vm_context *ctx, vm_stack *stack, int argc, vm_val *argv)
 
         gc_barrier(ctx, stack, stack->parent = ctx->stack);
         ctx->stack = stack;
-        vm_stack_push(ctx, stack, base[0], 1, used+argc - 2);
+        vm_stack_push(ctx, stack, base[0], 0, 1, used+argc - 2);
     }
 }
 
@@ -436,16 +476,35 @@ vm_val* vm_stack_current_base(vm_context *ctx, vm_stack *stack)
     return stack->vals.vals + frame->base;
 }
 
+int  vm_stack_pre_call(vm_context *ctx, vm_stack *stack, int count)
+{
+    vm_frame *frame;
+
+    if(stack->frames.used > 0)
+    {
+        /* makes the func relative to the current base, if there is one.. makes things simpler. */
+        frame = vm_stack_current_frame(ctx, stack);
+        count += frame->top;
+        vals_cover(ctx, stack, count);
+        return frame->top;
+    }
+    else
+    {
+        vals_cover(ctx, stack, count);
+        return 0;
+    }
+}
+
 static void vals_cover(vm_context *ctx, vm_stack *stack, int used)
 {
     vm_val_array *array = &stack->vals;
 
     if (used >= array->size)
     {
-        array->used  = used;
         array->size  = used*2 + 32;
         array->vals = gc_realloc(ctx, array->vals, sizeof(vm_val) * array->size);
     }
+    array->used  = used;
 }
 
 static vm_frame* push_frame(vm_context *ctx, vm_stack *stack)
@@ -455,9 +514,9 @@ static vm_frame* push_frame(vm_context *ctx, vm_stack *stack)
 
     if (used >= array->size)
     {
-        array->used  = used;
         array->size  = used*2 + 32;
         array->frames = gc_realloc(ctx, array->frames, sizeof(vm_frame) * array->size);
     }
+    array->used = used;
     return &array->frames[used-1];
 }

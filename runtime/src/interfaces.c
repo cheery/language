@@ -1,3 +1,42 @@
+#include "vm.h"
+
+vm_val vm_interface(vm_context *ctx, vm_val subject)
+{
+    vm_object *object;
+    if (subject == vm_null)
+    {
+        return vm_null;
+    }
+    switch (vm_typeof(subject))
+    {
+        case vm_t_constant:
+        case vm_t_integer:
+        case vm_t_double:
+            vm_panic(ctx);
+            return vm_null;
+        default:
+            object = vm_unbox_object(ctx, subject);
+            return object->interface;
+    }
+}
+
+vm_val vm_interface_method(vm_context *ctx, vm_val subject, vm_val name)
+{
+    vm_val interface, method;
+    vm_dict *dict;
+
+    interface = vm_interface(ctx, subject);
+    if (interface == vm_null)
+    {
+        return vm_null;
+    }
+
+    dict = vm_unbox(ctx, interface, vm_t_dict);
+    method = vm_null;
+    vm_dict_getitem(ctx, dict, name, &method);
+    return method;
+}
+
 //size_t   vm_dict_sizeof()
 //{
 //    return sizeof(vm_dict);

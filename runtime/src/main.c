@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
 
     vm_dict *baselib, *namespace;
 
-    baselib   = vm_new_dict(ctx, interface_stub);
+    baselib   = vm_load_baselib(ctx);
     namespace = vm_new_dict(ctx, interface_stub);
 
     vm_descriptor *desc;

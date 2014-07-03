@@ -1,6 +1,6 @@
 vm_stack* vm_new_stack(vm_context *ctx, vm_val self, int argc, vm_val *argv);
-void vm_stack_push(vm_context *ctx, vm_stack *stack, vm_val self, int func, int argc);
-void vm_stack_pop(vm_context *ctx, vm_stack *stack, vm_val self, vm_val retval);
+void vm_stack_push(vm_context *ctx, vm_stack *stack, vm_val self, int dst, int func, int argc);
+int  vm_stack_pop(vm_context *ctx, vm_stack *stack, vm_val retval);
 void vm_stack_resume(vm_context *ctx, vm_stack *stack, int argc, vm_val *argv);
 //
 //vm_stack* vm_new_stack(vm_context *ctx, vm_slot *self, int argc, vm_slot *argv);
@@ -49,3 +49,4 @@ void vm_stack_pop_except(vm_context *ctx, vm_stack *stack);
 vm_except* vm_stack_current_except(vm_context *ctx, vm_stack *stack);
 vm_frame* vm_stack_current_frame(vm_context *ctx, vm_stack *stack);
 vm_val*   vm_stack_current_base(vm_context *ctx, vm_stack *stack);
+int vm_stack_pre_call(vm_context *ctx, vm_stack *stack, int count);

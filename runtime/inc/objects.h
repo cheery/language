@@ -170,6 +170,7 @@ typedef struct
     vm_closure     *clos;
     vm_upval      **upvalues;
     vm_val          self;
+    int             dst;
     int             base;
     int             top;
     size_t          pc;
@@ -277,6 +278,7 @@ vm_val vm_box_integer(vm_context *ctx, int64_t integer);
 vm_val vm_box_double(vm_context *ctx, double value);
 vm_object_type vm_typeof(vm_val val);
 void*   vm_unbox(vm_context *ctx, vm_val val, vm_object_type type);
+void*   vm_unbox_object(vm_context *ctx, vm_val val);
 int     vm_unbox_bool(vm_context *ctx, vm_val val);
 int64_t vm_unbox_integer(vm_context *ctx, vm_val val);
 double  vm_unbox_double(vm_context *ctx, vm_val val);

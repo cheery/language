@@ -1,5 +1,7 @@
-#include <stdlib.h>
+#include "vm.h"
 #include <stdio.h>
+/*
+#include <stdlib.h>
 #include <string.h>
 #include "api.h"
 
@@ -8,63 +10,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-static void print(vm_context* ctx)
-{
-    size_t argc = vm_get_argc(ctx);
-    int j, i;
-    vm_value value;
-
-    for(j = 0; j < argc; j++)
-    {
-        value = vm_get_value(ctx, j);
-        switch (vm_unbox_tag(value))
-        {
-            case vm_tag_string:
-                printf("%s", vm_unbox_string(value));
-                break;
-            case vm_tag_object:
-                {
-                    char template[] = "<xxxx-xxxx-xxxx>";
-                    uint64_t halfbytes = (uint64_t)value;
-                    for (i = 11; i >= 0; i--)
-                    {
-                         
-                        template[1 + i + i / 4] = "0123456789abcdef"[halfbytes & 15];
-                        halfbytes >>= 4;
-                    }
-                    printf("%s", template);
-                }
-                break;
-            case vm_tag_double:
-                printf("%g", vm_unbox_double(value));
-                break;
-            case vm_tag_constant:
-                if (value == vm_box_boolean(1))
-                {
-                    printf("true");
-                    break;
-                }
-                if (value == vm_box_boolean(0))
-                {
-                    printf("false");
-                    break;
-                }
-            default:
-                {
-                    char template[] = "<xxxx-xxxx-xxxx-xxxx>";
-                    uint64_t halfbytes = (uint64_t)value;
-                    for (i = 15; i >= 0; i--)
-                    {
-                         
-                        template[1 + i + i / 4] = "0123456789abcdef"[halfbytes & 15];
-                        halfbytes >>= 4;
-                    }
-                    printf("%s", template);
-                }
-        }
-    }
-    printf("\n");
-}
 
 static void input(vm_context* ctx)
 {
@@ -174,8 +119,139 @@ static vm_lib vm_base_library[] = {
     {NULL, NULL}
 };
 
-vm_value vm_load_baselib()
+static void print(vm_context* ctx)
 {
+    size_t argc = vm_get_argc(ctx);
+    int j, i;
+    vm_value value;
+
+    for(j = 0; j < argc; j++)
+    {
+        value = vm_get_value(ctx, j);
+        switch (vm_unbox_tag(value))
+        {
+            case vm_tag_string:
+                printf("%s", vm_unbox_string(value));
+                break;
+            case vm_tag_object:
+                {
+                    char template[] = "<xxxx-xxxx-xxxx>";
+                    uint64_t halfbytes = (uint64_t)value;
+                    for (i = 11; i >= 0; i--)
+                    {
+                         
+                        template[1 + i + i / 4] = "0123456789abcdef"[halfbytes & 15];
+                        halfbytes >>= 4;
+                    }
+                    printf("%s", template);
+                }
+                break;
+            case vm_tag_double:
+                printf("%g", vm_unbox_double(value));
+                break;
+            case vm_tag_constant:
+                if (value == vm_box_boolean(1))
+                {
+                    printf("true");
+                    break;
+                }
+                if (value == vm_box_boolean(0))
+                {
+                    printf("false");
+                    break;
+                }
+            default:
+                {
+                    char template[] = "<xxxx-xxxx-xxxx-xxxx>";
+                    uint64_t halfbytes = (uint64_t)value;
+                    for (i = 15; i >= 0; i--)
+                    {
+                         
+                        template[1 + i + i / 4] = "0123456789abcdef"[halfbytes & 15];
+                        halfbytes >>= 4;
+                    }
+                    printf("%s", template);
+                }
+        }
+    }
+    printf("\n");
+}
+*/
+
+static void print(vm_context* ctx)
+{
+    size_t argc;
+   
+    argc = vm_c_argc(ctx);
+    int i, j;
+    vm_val value;
+    vm_string *string;
+
+    for (j = 0; j < argc; j++)
+    {
+        value = vm_c_load(ctx, j);
+        switch (vm_typeof(value))
+        {
+            case vm_t_string:
+                string = vm_unbox(ctx, value, vm_t_string);
+                printf("%s", string->data);
+                break;
+            case vm_t_object:
+                {
+                    char template[] = "<xxxx-xxxx-xxxx>";
+                    uint64_t halfbytes = (uint64_t)value;
+                    for (i = 11; i >= 0; i--)
+                    {
+                         
+                        template[1 + i + i / 4] = "0123456789abcdef"[halfbytes & 15];
+                        halfbytes >>= 4;
+                    }
+                    printf("%s", template);
+                }
+                break;
+            case vm_t_integer:
+                printf("%li", vm_unbox_integer(ctx, value));
+                break;
+            case vm_t_double:
+                printf("%g", vm_unbox_double(ctx, value));
+                break;
+            case vm_t_constant:
+                if (vm_unbox_bool(ctx, value))
+                {
+                    printf("true");
+                }
+                else
+                {
+                    printf("false");
+                }
+                break;
+           default:
+           {
+                char template[] = "<xxxx-xxxx-xxxx-xxxx>";
+                uint64_t halfbytes = (uint64_t)value;
+                for (i = 15; i >= 0; i--)
+                {
+                    template[1 + i + i / 4] = "0123456789abcdef"[halfbytes & 15];
+                    halfbytes >>= 4;
+                }
+                printf("%s", template);
+           }
+       }
+   }
+   printf("\n");
+}
+
+vm_dict* vm_load_baselib(vm_context *ctx)
+{
+    vm_dict *lib;
+
+    lib = vm_new_dict(ctx, interface_stub);
+
+    vm_dict_setitem(ctx, lib,
+            vm_box(ctx, vm_new_cstring(ctx, "print")),
+            vm_box(ctx, vm_new_builtin(ctx, "print", print)));
+
+    /*
     vm_value lib;
     vm_value iter_func;
 
@@ -192,5 +268,7 @@ vm_value vm_load_baselib()
     iter_func = vm_box_object(vm_new_closure(desc, NULL));
 
     vm_api_register(lib, "iter", iter_func);
+    */
     return lib;
 }
+

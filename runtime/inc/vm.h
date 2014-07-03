@@ -9,6 +9,16 @@
 #include "list.h"
 #include "stack.h"
 
+// baselib.c
+vm_dict* vm_load_baselib(vm_context *ctx);
+
+// builtin.c
+vm_builtin* vm_new_builtin(vm_context* ctx, const char* name, vm_builtin_func func);
+
+size_t vm_c_argc(vm_context *ctx);
+vm_val vm_c_load(vm_context *ctx, size_t index);
+void   vm_c_return(vm_context *ctx, vm_val val);
+
 // cmp.c
 int vm_cmp(vm_context *ctx, vm_val a, vm_val b);
 
@@ -19,10 +29,10 @@ vm_arraybuffer* vm_new_arraybuffer(vm_context *ctx, size_t length, const uint8_t
 #define vm_arraybuffer_count(a, format) ((a)->length / sizeof(format))
 
 #define interface_stub vm_null
+// interfaces.c
+vm_val     vm_interface_method(vm_context *ctx, vm_val subject, vm_val name);
 
-//#include "interfaces.h"
-//#include "list.h"
-//
+
 vm_path*   vm_path_parse(vm_context *ctx, const char* cpath);
 vm_path*   vm_new_path(vm_context *ctx, vm_string *string, vm_path *parent);
 vm_string* vm_path_cpath(vm_context *ctx, vm_path *path);
@@ -60,5 +70,6 @@ vm_descriptor* vm_module_load(vm_context *ctx, vm_path *path, vm_dict *baselib, 
  *      moving stuff around in same object doesn't require a gc_barrier.
  *      setting stuff true/false/null doesn't require a gc_barrier.
  */
+
 
 void vm_loop(vm_context* ctx);
