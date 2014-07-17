@@ -1,0 +1,206 @@
+#!/usr/bin/python3
+import curses
+from codecard import *
+
+high    = 1 << 32
+tabsize = 4
+
+def main(screen):
+    curses.cbreak()
+    curses.noecho()
+    curses.meta(1)
+    screen.keypad(0)
+    card = Card()
+    #pad = Pad(Card(), motion, "pad")
+    key = ''
+    #while pad.modes:
+        #pad.modes[-1](screen, pad)
+    while key != '\x1b':
+        draw(screen, card, repr(key))
+
+        key = screen.getkey()
+        if key == '\n':
+            card.put(card.bot, TextLineBuffer(None, Line(), [], Line()))
+        else:
+            card.put(card.bot, TextBuffer(None, list(key)))
+        
+def draw(screen, card, message):
+    height, width = screen.getmaxyx()
+    screen.clear()
+    for i, line in enumerate(card.lines):
+        screen.addstr(i, line.indent * tabsize, ''.join(line.text))
+    screen.addstr(height-1, 0, message)
+#    screen.move(y, x)
+    screen.refresh()
+
+#def motion(screen, pad):
+#    card = pad.card
+#    #card.y = clamp(card.y, 0, len(card.lines) - 1)
+#    #card.x = clamp(card.x, 0, len(card.line) - 1)
+#    draw(screen, card, pad.message, card.head, card.y)
+#    pad.message = ''
+#    text = screen.getkey()
+#    if text == '\x1b':
+#        pad.modes.pop(-1)
+#    elif text == 'i':
+#        pad.modes.append(insert)
+#    elif text == 'I':
+#        card.x = 0
+#        pad.modes.append(insert)
+#    elif text == 'a':
+#        card.x = card.head + 1
+#        pad.modes.append(insert)
+#    elif text == 'A':
+#        card.x = high
+#        pad.modes.append(insert)
+#    elif text == '0':
+#        card.x = 0
+#    elif text == '$':
+#        card.x = high
+#    elif text == 'h' and card.head > card.line.base:
+#        card.x = card.head - 1
+#    elif text == '\x7f' and card.head > card.line.base:
+#        card.x = card.head - 1
+#    elif text == '\x7f' and card.y > 0:
+#        card.x = len(card.line)
+#        card.y -= 1
+#    elif text == 'l' and card.head < card.line.tail - 1:
+#        card.x = card.head + 1
+#    elif text == 'j' or text == '\n':
+#        card.y = clamp(card.y+1, 0, len(card.lines) - 1)
+#    elif text == 'J' and card.y + 1 < len(card.lines):
+#        card.x = card.join_line(card.y)
+#    elif text == 'k':
+#        card.y = clamp(card.y-1, 0, len(card.lines) - 1)
+#    elif text == 'A':
+#        card.x = len(card.line)
+#        pad.modes.append(insert)
+#    elif text == 'o':
+#        card.y = card.insert_line(card.y+1, Line('', card.line.indent))
+#        card.x = 0
+#        pad.modes.append(insert)
+#    elif text == 'O':
+#        card.y = card.insert_line(card.y, Line('', card.line.indent))
+#        card.x = 0
+#        pad.modes.append(insert)
+#    elif text == '<' and card.line.indent > 0:
+#        card.line.indent -= 1
+#    elif text == '>':
+#        card.line.indent += 1
+#    elif text == '_':
+#        card.x = card.line.base
+#    elif text == 'x':
+#        card.line.remove(card.head)
+#    elif text == 'd':
+#        card.lines.pop(card.y)
+#        if len(card.lines) == 0:
+#            card.lines.append(Line(''))
+#        card.y = clamp(card.y, 0, len(card.lines) - 1)
+#
+#def insert(screen, pad):
+#    card = pad.card
+#    draw(screen, card, '-- insert --' + pad.message, card.index, card.y)
+#    text = screen.getkey()
+#    if text == '\x1b':
+#        pad.modes.pop(-1)
+#    elif text == '\x7f' and card.index > card.line.base:
+#        index  = card.index - 1
+#        card.x = index
+#        card.line.remove(index)
+#    elif text == '\x7f' and card.index > 0:
+#        card.line.indent -= 1
+#        card.x = card.line.base
+#    elif text == '\x7f' and card.index == 0 and card.y > 0:
+#        card.x = card.join_line(card.y-1)
+#        card.y = card.y - 1
+#    elif text == '\n':
+#        card.lines[card.y], tail = card.line.split(card.index)
+#        card.y = card.insert_line(card.y+1, tail)
+#        card.x = card.line.base
+#    elif text == '\t':
+#        base = card.line.base
+#        card.line.indent += 1
+#        card.x = card.index + card.line.base - base
+#    else:
+#        card.x = card.line.insert(card.index, text)
+#    pad.message = repr(text)
+#
+#
+#class Pad:
+#    def __init__(self, card, mode, message):
+#        self.card = card
+#        self.modes = [mode]
+#        self.message = message
+#
+#class Card:
+#    def __init__(self, lines=None, x=0, y=0):
+#        self.lines = lines or [Line()]
+#        self.x = x
+#        self.y = y
+#
+#    @property
+#    def index(self):
+#        return clamp(self.x, self.line.base, self.line.tail)
+#
+#    @property
+#    def head(self):
+#        return clamp(self.x, self.line.base, self.line.tail-1)
+#    
+#    @property
+#    def line(self):
+#        assert 0 <= self.y <= len(self.lines)
+#        return self.lines[self.y]
+#
+#    def insert_line(self, y, line):
+#        assert isinstance(line, Line)
+#        self.lines.insert(y, line)
+#        return y
+#
+#    def remove_line(self, y):
+#        return self.lines.pop(y)
+#
+#    def join_line(self, y):
+#        i = self.lines[y].tail
+#        self.lines[y] += self.lines.pop(y+1)
+#        return i
+#
+#class Line:
+#    def __init__(self, text='', indent=0):
+#        self.text   = text
+#        self.indent = indent
+#
+#    @property
+#    def base(self):
+#        return self.indent * tabsize
+#
+#    @property
+#    def tail(self):
+#        return self.indent * tabsize + len(self.text)
+#
+#    def insert(self, i, text):
+#        i -= self.base
+#        assert 0 <= i <= len(self.text)
+#        self.text = self.text[:i] + text + self.text[i:]
+#        return i + len(text) + self.base
+#
+#    def remove(self, i, length=1):
+#        i -= self.base
+#        assert 0 <= i <= len(self.text)
+#        text = self.text[i:i+length]
+#        self.text = self.text[:i] + self.text[i+length:]
+#        return text
+#
+#    def split(self, i):
+#        i -= self.base
+#        head = Line(self.text[:i], self.indent)
+#        tail = Line(self.text[i:], self.indent)
+#        return head, tail
+#
+#    def __add__(self, other):
+#        return Line(self.text + other.text, self.indent)
+
+def clamp(x, mi, ma):
+    return max(mi, min(ma, x))
+
+if __name__=='__main__':
+    curses.wrapper(main)
