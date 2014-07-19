@@ -2,34 +2,39 @@ from lr import build_canonical, Parser, rule, SynError
 
 def main():
     specials = {}
+    #for token in tokenize(open("test", "r"), specials):
+    #    print(token)
+    rules = [
+        rule("program", "symbols"),
+        rule("program", "program", "newline", "symbols"),
+        rule("symbols", "symbol"),
+        rule("symbols", "symbols symbol"),
+    ]
+    table, analysis, errors = build_canonical(rules, accept="program")
+    assert len(errors) == 0
+    print("rows:", len(table), "cells:", sum(len(row) for row in table))
+    def compiler(rule, expr, start, stop):
+        print(rule, expr, start, stop)
+        return expr
+    parser = Parser(table, compiler)
+    index = 0
     for token in tokenize(open("test", "r"), specials):
-        print(token)
-    #rules = [
-    #]
-    #table, analysis, errors = build_canonical(rules, accept="a")
-    #assert len(errors) == 0
-    #print("rows:", len(table), "cells": sum(len(row) for row in table))
-    #def compiler(rule, expr, start, stop):
-    #    print(rule, expr, start, stop)
-    #    return expr
-    #parser = Parser(table, compiler)
-    #index = 0
-    #for token in tokenize(fd, 0):
-    #    parser.step(token.group, token.string, token.start, token.stop)
-    #    index = token.stop
-    #result = parser.done(index)
+        parser.step(token.group, token.string, token.start, token.stop)
+        index = token.stop
+    result = parser.done(index)
 
 def tokenize(fd, specials, index=0):
     ah = CharacterLookahead(fd, index)
     indent = 0
     layers = []
+    newlines = False
     while ah.ch != '':
         while ah.ch == ' ':
             ah.advance()
         if ah.ch == '#':
             while ah.ch != '\n':
                 ah.advance()
-        elif ah.ch == '\n':
+        if ah.ch == '\n':
             ah.advance()
             spaces = 0
             while ah.ch == ' ':
@@ -37,16 +42,18 @@ def tokenize(fd, specials, index=0):
                 ah.advance()
             if ah.ch != '\n' and ah.ch != '#' and ah.ch:
                 if spaces > indent:
-                    layers.append(indent)
                     indent = spaces
-                    yield Token(ah.index, ah.index, "indent", "")
+                    if newlines:
+                        layers.append(indent)
+                        yield Token(ah.index, ah.index, "indent", "")
                 else:
                     while spaces < indent:
                         yield Token(ah.index, ah.index, "dedent", "")
                         indent = layers.pop(-1)
                     if spaces > indent:
                         raise SynError(ah.index, ah.index, "inconsistent indentaton level")
-                    yield Token(ah.index, ah.index, "newline", "")
+                    if newlines:
+                        yield Token(ah.index, ah.index, "newline", "")
         elif issym(ah.ch):
             string = ah.advance()
             start  = ah.index
@@ -77,7 +84,7 @@ def tokenize(fd, specials, index=0):
             start  = ah.index
             string = ah.advance()
             while string + ah.ch in specials:
-                string = ah.advance()
+                string += ah.advance()
             yield Token(start, ah.index, specials[string], string)
         elif ah.ch == '"' or ah.ch == "'":
             start  = ah.index
@@ -90,6 +97,11 @@ def tokenize(fd, specials, index=0):
                     raise SynError(start, ah.index, "unterminated string")
             string += ah.advance()
             yield Token(start, ah.index, "string", string)
+        else:
+            start = ah.index
+            string = ah.advance()
+            raise SynError(start, ah.index, "unexpected character {!r}".format(string))
+        newlines = True
     for layer in layers:
         yield Token(ah.index, ah.index, "dedent", "")
 
