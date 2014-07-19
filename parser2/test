@@ -1,0 +1,7 @@
+# this file tests the tokenizer
+hello 
+    "world"
+    "string \"example\""
+    'bau'
+    52 0x12 8x123 2x01010
+    10.5
