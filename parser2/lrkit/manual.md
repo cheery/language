@@ -9,13 +9,15 @@ Production rules that form a grammar when put into a list.
 
     rule = lrkit.Rule(lhs, prod)
     rule = lrkit.rule(lhs, *prod)
+    acc  = lrkit.Accept(prod)
 
 Has following operations defined:
 
     len(rule)
     rule[n]
+    rule.lhs
 
-## SnError
+## Errors
 
 The syntax error exception.
 
@@ -23,6 +25,14 @@ The syntax error exception.
     sn.message
     sn.start
     sn.stop
+
+The tokenizing error exception, subclass of `SnError`
+
+    sn = TokenError(message, start, stop)
+
+The parsing error exception, subclass of `SnError`
+
+    sn = ParseError(message, start, stop)
 
 ## Canonical parser table generator
 
@@ -80,6 +90,27 @@ studied the conflicts list. If you're explorative, you might
 use this to implement GLR parser, or parse with ambiguous
 grammars.
 
+## Parser
+
+    def visitor(rule, pos, value, *args):
+        pass
+    parser = lrkit.Parser(results, visitor, *args)
+    if parser.idle:
+        pass
+    try:
+        index = 0
+        for token in tokens:
+            parser.step(token.start, token.stop, token.group, token.value)
+            index = token.stop
+        result = parser.step(index, index, None, None)
+    except lrkit.SnError, sn:
+        print sn
+        parser.reset()
+
+The parser starts in idle state. The `parser.reset()` can be used to
+recover the parser back into the idle state. This is proposed after
+a syntax error if the parsing won't continue.
+
 ## Tokenizer
 
     tokens = lrkit.tokenize(fd, specials, index=0)
@@ -106,6 +137,6 @@ Token groups that are recognised:
 
 Errors that may be produced:
 
-    SnError("inconsistent indentation")
-    SnError("unterminated string")
-    SnError("unexpected character")
+    TokenError("inconsistent indentation")
+    TokenError("unterminated string")
+    TokenError("unexpected character")

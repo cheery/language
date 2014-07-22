@@ -1,8 +1,8 @@
-from .rule import Rule
+from .rule import Rule, Accept
 
 def simulate(rules, accept):
     terminals, nonterminals = analyse(rules)
-    init = Rule(None, [accept])
+    init = Accept([accept])
     initset = frozenset({Item(init, 0, None)})
     kernelindices = {initset:0}
     kernelsets = [initset]

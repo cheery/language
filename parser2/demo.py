@@ -1,4 +1,16 @@
-from lrkit import Rule, rule, canonical
+from lrkit import Parser, Rule, rule, canonical, tokenize, SnError
+
+specials = {
+        "*": "*",
+        "/": "/",
+        "%": "%",
+        "+": "+",
+        "-": "-",
+        "0": "0",
+        "(": "(",
+        ")": ")",
+        ",": ",",
+}
 
 rules = [
     rule("Program", "Expr"),
@@ -14,7 +26,7 @@ rules = [
     rule("ProductOp", "%"),
     rule("SumOp", "+"),
     rule("SumOp", "-"),
-    rule("Term", "0"),
+    rule("Term", "symbol"),
     rule("Term", "(", "ExprList", ")"),
 
     rule("ExprList"),
@@ -22,17 +34,11 @@ rules = [
     rule("ExprList", "ExprList", ",", "Expr"),
 ]
 
-results = canonical.simulate(rules, "Program")
+def visit(rule, pos, data):
+    print "reduction", rule, pos, data
+    return None
 
-#print results.terminals
-#for symbol, result in results.nonterminals.items():
-#    print "first:", result.first
-#    print "allow empty:", result.empty
-#    print "rules:"
-#    for rule in result.rules:
-#        print "   ", rule
-#    print ""
-#
+results = canonical.simulate(rules, "Program")
 print "conflicts:", len(results.conflicts)
 for row, symbol, conflict in results.conflicts:
     print "row", row
@@ -42,4 +48,17 @@ for row, symbol, conflict in results.conflicts:
             print "  ", thing
         else:
             print "  ", thing
-#print "kernelsets:", results.kernelsets
+
+parser = Parser(results, visit)
+from sys import stdin
+
+while True:
+    try:
+        index = 0
+        for token in tokenize(stdin.readline(), specials):
+            parser.step(token.start, token.stop, token.group, token.value)
+            index = token.stop
+        result = parser.step(index, index, None, None)
+    except SnError, e:
+        print e 
+        parser.reset()

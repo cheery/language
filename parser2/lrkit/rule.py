@@ -1,8 +1,4 @@
-class Rule:
-    def __init__(self, lhs, prod):
-        self.lhs = lhs
-        self.prod = prod
-
+class Base:
     def __repr__(self):
         return "{} -> {}".format(self.lhs, ' '.join(map(str, self.prod)))
 
@@ -11,3 +7,13 @@ class Rule:
 
     def __len__(self):
         return len(self.prod)
+
+class Rule(Base):
+    def __init__(self, lhs, prod):
+        self.lhs = lhs
+        self.prod = prod
+
+class Accept(Base):
+    def __init__(self, prod):
+        self.lhs  = "accept"
+        self.prod = prod

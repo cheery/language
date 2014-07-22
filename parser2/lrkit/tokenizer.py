@@ -1,6 +1,9 @@
-from .snerror import SnError
+from .errors import TokenError
+from StringIO import StringIO
 
 def tokenize(fd, specials, index=0):
+    if isinstance(fd, (str, unicode)):
+        fd = StringIO(fd)
     ah = CharacterLookahead(fd, index)
     indent = 0
     layers = []
@@ -28,7 +31,7 @@ def tokenize(fd, specials, index=0):
                         yield Token(ah.index, ah.index, "dedent", "")
                         indent = layers.pop(-1)
                     if spaces > indent:
-                        raise SnError("inconsistent indentation", ah.index, ah.index)
+                        raise TokenError("inconsistent indentation", ah.index, ah.index)
                     if newlines:
                         yield Token(ah.index, ah.index, "newline", "")
         elif issym(ah.ch):
@@ -65,7 +68,7 @@ def tokenize(fd, specials, index=0):
                     string += ah.advance()
                 string += ah.advance()
                 if ah.ch == '':
-                    raise SnError("unterminated string", start, ah.index)
+                    raise TokenError("unterminated string", start, ah.index)
             string += ah.advance()
             yield Token(start, ah.index, "string", string)
         else:
@@ -80,7 +83,7 @@ def tokenize(fd, specials, index=0):
                     string += ah.advance()
                 yield Token(start, ah.index, specials[string], string)
             else:
-                raise SnError("unexpected character {!r}".format(string), start, ah.index)
+                raise TokenError("unexpected character {!r}".format(string), start, ah.index)
         newlines = True
     for layer in layers:
         yield Token(ah.index, ah.index, "dedent", "")
