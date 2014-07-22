@@ -44,7 +44,7 @@ def closure_of(kernel, nonterminals):
             reduceset.add(item)
             continue
         expect = item.expect
-        follow = follow_of(item, nonterminals)
+        follow = follow_of(item, nonterminals, 1)
         if expect in closure_sets:
             closure = closure_sets[expect]
         else:
@@ -58,10 +58,14 @@ def closure_of(kernel, nonterminals):
                     queue(Item(rule, 0, ahead))
     return closure_sets, reduceset
 
-def follow_of(item, nonterminals):
-    anticipate = item.anticipate
+def follow_of(item, nonterminals, offset):
+    anticipate = item.anticipate(offset)
     if anticipate in nonterminals:
-        return nonterminals[anticipate].first
+        info = nonterminals[anticipate]
+        if info.empty:
+            return info.first | follow_of(item, nonterminals, offset+1)
+        else:
+            return info.first
     else:
         return {anticipate}
 
@@ -84,29 +88,31 @@ def analyse(rules):
             result = results[symbol] = Analysis()
         result.rules.append(rule)
         result.empty |= (len(rule) == 0)
-    n = 0
-    m = 0
     for symbol, result in results.items():
         for rule in result.rules:
-            for index, cell in enumerate(rule):
+            for cell in rule:
                 if cell not in results:
                     terminals.add(cell)
-                    if index == 0:
-                        result.first.add(cell)
-        m += len(result.first)
-    while n < m:
-        n = m
-        m = 0
+    changed = True
+    while changed:
+        changed = False
         for symbol, result in results.items():
+            n = len(result.first)
             for rule in result.rules:
+                e = 0
                 for cell in rule:
                     if cell not in results:
-                        continue
+                        result.first.add(cell)
+                        break
                     cellinfo = results[cell]
                     result.first.update(cellinfo.first)
                     if not cellinfo.empty:
                         break
-            m += len(result.first)
+                    e += 1
+                if e == len(rule) and not result.empty:
+                    result.empty = True
+                    changed = True
+            changed |= n < len(result.first)
     return terminals, results
 
 class Analysis:
@@ -141,10 +147,9 @@ class Item:
         else:
             return self.ahead
 
-    @property
-    def anticipate(self):
-        if self.index + 1 < len(self.rule):
-            return self.rule[self.index + 1]
+    def anticipate(self, offset):
+        if self.index + offset < len(self.rule):
+            return self.rule[self.index + offset]
         else:
             return self.ahead
 

@@ -4,6 +4,7 @@ from StringIO import StringIO
 def tokenize(fd, specials, index=0):
     if isinstance(fd, (str, unicode)):
         fd = StringIO(fd)
+    specials = with_prefixes(specials)
     ah = CharacterLookahead(fd, index)
     indent = 0
     layers = []
@@ -81,7 +82,11 @@ def tokenize(fd, specials, index=0):
             elif string in specials:
                 while string + ah.ch in specials:
                     string += ah.advance()
-                yield Token(start, ah.index, specials[string], string)
+                group = specials[string]
+                if group is None:
+                    raise TokenError("unexpected character {!r}".format(string[0]), start, ah.index)
+                else:
+                    yield Token(start, ah.index, group, string)
             else:
                 raise TokenError("unexpected character {!r}".format(string), start, ah.index)
         newlines = True
@@ -93,6 +98,14 @@ def issym(ch):
 
 def isnum(ch):
     return ch.isdigit()
+
+def with_prefixes(specials):
+    result = {}
+    for key in specials:
+        while len(key) > 0:
+            result[key] = specials.get(key)
+            key = key[:-1]
+    return result
 
 class CharacterLookahead:
     def __init__(self, fd, index):

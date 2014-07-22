@@ -121,8 +121,8 @@ a syntax error if the parsing won't continue.
         token.value
 
 The specials is a dictionary of symbols accepted as special symbols.
-Every special symbol must have a prefix. eg. {'=':"eqv", '==':"eq"}
-The specials rewrite themselves as unique token groups.
+For example: {'+':"add", '==':"eq"} The specials rewrite themselves
+as unique token groups.
 
 Token groups that are recognised:
 
