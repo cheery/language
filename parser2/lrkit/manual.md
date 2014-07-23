@@ -140,3 +140,41 @@ Errors that may be produced:
     TokenError("inconsistent indentation")
     TokenError("unterminated string")
     TokenError("unexpected character")
+
+## Grammar Language
+
+This is a separate part of the remaining. It is a grammar language loader.
+
+    import lrkit.grammar
+
+    results, attach = lrkit.grammar.load(path, accept, cache=True)
+    assert len(results.conflicts) == 0
+    parser = attach(class_or_module, *args)
+
+    # class_or_module.command(pos, value, *args)
+
+The grammar has a separate cache saver and loader which is able to
+store your grammars. Unfortunately the format cannot cache the conflicts
+or item sets, so it's use is excluded for the lrkit itself for now.
+
+The grammar binds the rules to commands, and has a mini-syntax for removing
+and ordering the match to fit the command.
+Here's the grammar understood by the grammar loader, written in it's own language:
+
+    grammar_new 0     Grammar -> Binding
+    grammar_cat [0 2] Grammar -> Grammar newline binding
+    binding           Binding -> symbol Pick Rule
+    rule              Rule    -> symbol arrow Symbols
+
+    list_begin   Symbols ->
+    list_append  Symbols -> Symbols symbol
+
+    list_begin   Integers ->
+    list_append  Integers -> Integers integer
+
+    # Passes the whole match as list
+    pick_all     Pick -> 
+    # Passes only single part
+    pick_one  0  Pick -> integer
+    # Passes parts from the match in given order as a list
+    pick_many 1  Pick -> lbracket Integers rbracket

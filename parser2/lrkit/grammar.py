@@ -1,8 +1,10 @@
-from .canonical import simulate
+from .canonical import simulate, Results
 from .parser import Parser
 from .rule import Rule
 from .tokenizer import tokenize
 from .errors import SnError
+from .cache import load_cache, write_cache
+import os
 
 specials = {
     "->": "arrow",
@@ -76,14 +78,25 @@ def parse(fd, index=0):
         index = token.stop
     return parser.step(index, index, None, None)
 
-def load(path, accept):
+def load(path, accept, cache=True):
+    cpath = cache_path(path)
+    if cache and os.path.exists(cpath):
+        if os.stat(cpath).st_mtime >= os.stat(path).st_mtime:
+            table, init, grammar = load_cache(cpath)
+            results = Results(grammar, init, None, None, table, None, [])
+            return results, instantiator(grammar, results)
     with open(path) as fd:
         grammar = parse(fd)
     results = simulate(grammar, accept)
     if len(results.conflicts) == 0:
+        if cache:
+            write_cache(cpath, results, grammar)
         return results, instantiator(grammar, results)
     else:
         return results, None
+
+def cache_path(path):
+    return os.path.splitext(path)[0] + '.cache.gr'
 
 def instantiator(grammar, results):
     def _instantiate(obj, *args):

@@ -27,7 +27,7 @@ def simulate(rules, accept):
                 add_conflict(conflicts, table, i, symbol, index)
             else:
                 table[i][symbol] = index
-    return Results(rules, terminals, nonterminals, table, kernelsets, conflicts)
+    return Results(rules, init, terminals, nonterminals, table, kernelsets, conflicts)
 
 def closure_of(kernel, nonterminals):
     closure_sets = {}
@@ -160,8 +160,9 @@ class Item:
         return "{} -> {} | {}".format(self.rule.lhs, ' '.join(both), self.ahead)
 
 class Results:
-    def __init__(self, rules, terminals, nonterminals, table, kernelsets, conflicts):
+    def __init__(self, rules, init, terminals, nonterminals, table, kernelsets, conflicts):
         self.rules = rules
+        self.init  = init
         self.terminals = terminals
         self.nonterminals = nonterminals
         self.table = table
