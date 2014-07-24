@@ -1,0 +1,3 @@
+[submodule "lib/lrkit"]
+	path = lib/lrkit
+	url = https://github.com/cheery/lrkit
