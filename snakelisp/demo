@@ -1,0 +1,3 @@
+(jello = 2)
+(hello = (func (x) 5))
+(((func () (jello := 3) hello) 15)
