@@ -3,10 +3,13 @@
 #include <stdint.h>
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
 typedef struct value   value_t;
 typedef struct closure closure_t;
 typedef struct argv    argv_t;
+typedef struct string  string_t;
 
 typedef void (*code_t)(closure_t*, argv_t*);
 
@@ -19,11 +22,13 @@ struct value
     uint8_t type;
     union {
         long        integer;
+        string_t   *string;
         closure_t  *closure;
     } data;
 };
 #define TYPE_NULL    0
 #define TYPE_INTEGER 1
+#define TYPE_STRING  2
 #define TYPE_CLOSURE 1
 
 /*
@@ -44,6 +49,15 @@ struct argv
 {
     size_t   valz;
     value_t  val[];
+};
+
+/*
+ * Some basic data types compose complex data types.
+ */
+struct string
+{
+    size_t  length;
+    char    data[];
 };
 
 static inline value_t c_const_null()
@@ -68,6 +82,17 @@ static inline value_t c_const_closure(closure_t *closure)
     return val;
 }
 
+static inline value_t c_const_string_init(string_t *string, size_t length, const char *data)
+{
+    value_t val   = {TYPE_STRING};
+    val.data.string = string;
+    string->length = length;
+    memcpy(string->data, data, length);
+    return val;
+}
+
+// some implementations might refuse to inline the function if it uses alloca
+#define c_const_string(x) c_const_string_init(alloca(sizeof(string_t) + sizeof(char)*(strlen(x)+1)), strlen(x), x);
 
 // for now not sure how it enforces.
 #define c_noreturn
@@ -113,10 +138,38 @@ static void c_quit(closure_t *clos, argv_t *args)
     exit(0);
 }
 
+value_t cl_file_write;
+value_t v_stdin, v_stdout, v_stderr;
+
+static void sys_file_write(closure_t *clos, argv_t *args)
+{
+    printf("achievement: file write\n");
+    value_t cont = c_get_argument(args, 1);
+    value_t data = c_get_argument(args, 2);
+    value_t fd   = c_get_argument(args, 3);
+    assert (data.type == TYPE_STRING);
+    assert (fd.type == TYPE_INTEGER);
+
+    c_call_begin(2);
+    c_call_argument(0, cont);
+    c_call_argument(1, c_const_integer(write(
+        fd.data.integer,
+        data.data.string->data,
+        data.data.string->length)));
+    c_call_end();
+}
+
 static inline void c_boot(code_t entry)
 {
     closure_t closure = {entry,  0};
     closure_t cont    = {c_quit, 0}; 
+
+    closure_t file_write = {sys_file_write, 0};
+
+    cl_file_write = c_const_closure(&file_write);
+    v_stdin  = c_const_integer(0);
+    v_stdout = c_const_integer(1);
+    v_stderr = c_const_integer(2);
 
     printf("achievement: bootup\n");
     c_call_begin(2);

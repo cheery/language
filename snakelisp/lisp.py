@@ -1,6 +1,7 @@
 import parser
 import transpiler
 from cps import Call, Lambda, Assign, Variable, Constant, Environ, null, true, false
+import subprocess
 
 # call = Call([arguments]), call[i]
 # lambda = Lambda([arguments], body), lambda[i]
@@ -17,10 +18,19 @@ def main():
         var = continuate(mks, expr, env)
     program = env.close(compose(mks, Call([ret, var])))
     program = program.coalesce()
-    for var in env.unbound:
-        var.glob = True
+
+    c_api = {
+        "file-write": "&cl_file_write",
+        "stdin":  "&v_stdin",
+        "stdout": "&v_stdout",
+        "stderr": "&v_stderr",
+    }
+    for var in env.seal():
+        var.c_handle = c_api[var.name]
     source = transpiler.transpile(program)
     open('demo.c', 'w').write(source)
+    subprocess.call(["gcc", "demo.c"])
+
 
 constants = {'null': null, 'true':true, 'false':false}
 def continuate(mks, expr, env):
@@ -59,7 +69,9 @@ def continuate(mks, expr, env):
         return Constant(expr.value)
     if expr.group == 'double':
         return Constant(expr.value)
-    return Exception("what is {}?".format(expr))
+    if expr.group == 'string':
+        return Constant(expr.value)
+    raise Exception("what is {}?".format(expr))
 
 def ismacro(expr, name):
     return expr.group == 'list' and len(expr) > 0 and expr[0].value == name

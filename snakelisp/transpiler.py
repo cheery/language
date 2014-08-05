@@ -49,6 +49,8 @@ def transpile(lamb):
                 dump("value_t {} = c_const_false();", name)
             elif isinstance(const, (int, long)):
                 dump("value_t {} = c_const_integer({});", name, const)
+            elif isinstance(const, (str, unicode)):
+                dump("value_t {} = c_const_string({});", name, const)
             else:
                 raise Exception("what is this? {}".format(const))
 
@@ -134,7 +136,9 @@ def scrape_closures(func):
 
 def as_argument(ctx, func, arg):
     if arg.type == 'variable':
-        return func.env.get(arg, arg.name)
+        if arg.glob:
+            return arg.c_handle
+        return func.env[arg]
     if arg.type == 'constant':
         return func.env[arg.value]
     if arg.type == 'lambda':

@@ -83,6 +83,7 @@ class Environ(object):
         self.inside   = {}
         self.outside  = {}
         self.unbound  = set()
+        self.implicit = {}
         self.children = []
         self.closed   = False
 
@@ -93,6 +94,13 @@ class Environ(object):
             var = Variable(name)
         self.arguments.append(var)
         return var
+
+    def new_implicit(self, name):
+        if name in self.implicit:
+            return self.implicit[name]
+        else:
+            var = self.implicit[name] = Variable(name)
+            return var
 
     def get_local(self, name, initnull=True):
         if name in self.inside:
@@ -113,6 +121,7 @@ class Environ(object):
 
     def new_environ(self):
         env = Environ()
+        env.implicit = self.implicit
         self.children.append(env)
         return env
 
@@ -128,3 +137,11 @@ class Environ(object):
         lamb = Lambda(self.arguments, body)
         lamb.motion.extend(self.motion)
         return lamb
+
+    def seal(self):
+        for var in self.unbound:
+            var.glob = True
+            yield var
+        for var in self.implicit.values():
+            var.glob = True
+            yield var
