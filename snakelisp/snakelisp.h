@@ -254,7 +254,7 @@ static inline string_t *initString(string_t *string, size_t length, const char *
     size_t i;
     string->byteLength = length+1;
     string->length = length;
-    for (i = 0; i < length; i++) string->data[i] = data[i];
+    if (data) for (i = 0; i < length; i++) string->data[i] = data[i];
     string->data[length] = 0;
     return string;
 }

@@ -4,4 +4,37 @@
 (file-close fd)
 (file-write stdout buf count)
 (file-write stdout "hello hello\n")
+
+(print = (func (line)
+    (file-write stdout (cat line "\n"))))
+
+(print "hello snake")
+
+
+(if false
+    (print "can't be!")
+    (print "maybe!"))
+
+(if true
+    (print "yes.")
+    (print "no."))
+
+(if (null? (cond))
+    (print "sad cond :<") null)
+
+(cond
+    (else
+        (print "odd cond. :>")))
+
+(cond
+    ((null? null)
+        (print "null is null"))
+    (else
+        (print "weeird")) )
+
+
 # TODO: implement cond
+#
+#(i = 0)
+#(i = (+ i 1))
+#
