@@ -20,6 +20,7 @@ def main():
     program = program.coalesce()
 
     c_api = {
+        "call/cc":     "&v_call_cc",
         "pick":        "&v_pick",
         "array":       "&v_array",
         "arraybuffer": "&v_arraybuffer",

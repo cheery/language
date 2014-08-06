@@ -4,6 +4,18 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+static CONTINUATION(call_cc_continue)
+{
+    call(*SLOT(0), ARG(2));
+}
+
+static CONTINUATION(call_cc)
+{
+    value_t cont = ARG(1);
+    value_t func = spawnClosure(call_cc_continue, &cont);
+    call(ARG(2), func);
+}
+
 static CONTINUATION(pick)
 {
     value_t cond = ARG(2);
@@ -286,6 +298,7 @@ static CONTINUATION(is_string)
 //    c_call_end();
 //}
 value_t
+    v_call_cc,
     v_pick,
     v_array,
     v_arraybuffer,
@@ -319,6 +332,7 @@ static CONTINUATION(quit)
 
 void snakeBoot(value_t entry)
 {
+    v_call_cc = spawnClosure(call_cc);
     v_pick = spawnClosure(pick);
     v_array       = spawnClosure(new_array);
     v_arraybuffer = spawnClosure(new_arraybuffer);
