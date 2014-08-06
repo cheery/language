@@ -6,10 +6,11 @@
 #include <string.h>
 #include <unistd.h>
 
-typedef struct value   value_t;
-typedef struct closure closure_t;
-typedef struct argv    argv_t;
-typedef struct string  string_t;
+typedef struct value        value_t;
+typedef struct closure      closure_t;
+typedef struct argv         argv_t;
+typedef struct string       string_t;
+typedef struct arraybuffer  arraybuffer_t;
 
 typedef void (*code_t)(closure_t*, argv_t*);
 
@@ -21,15 +22,35 @@ struct value
 {
     uint8_t type;
     union {
-        long        integer;
-        string_t   *string;
-        closure_t  *closure;
+        long            integer;
+        string_t        *string;
+        closure_t       *closure;
+        arraybuffer_t   *arraybuffer;
     } data;
 };
 #define TYPE_NULL    0
-#define TYPE_INTEGER 1
-#define TYPE_STRING  2
-#define TYPE_CLOSURE 1
+#define TYPE_BOOLEAN 1
+#define TYPE_INTEGER 2
+#define TYPE_STRING  3
+#define TYPE_ARRAYBUFFER  4
+#define TYPE_ARRAY   127
+#define TYPE_CLOSURE 128
+
+
+/*
+ * Some basic data types compose complex data types.
+ */
+struct string
+{
+    size_t  length;
+    char    data[];
+};
+
+struct arraybuffer
+{
+    size_t  length;
+    uint8_t data[];
+};
 
 /*
  * This is pass by value system, so the argument list is itself
@@ -51,15 +72,6 @@ struct argv
     value_t  val[];
 };
 
-/*
- * Some basic data types compose complex data types.
- */
-struct string
-{
-    size_t  length;
-    char    data[];
-};
-
 static inline value_t c_const_null()
 {
     value_t val = {TYPE_NULL, 0};
@@ -68,7 +80,6 @@ static inline value_t c_const_null()
 
 static inline value_t c_const_integer(long integer)
 {
-    printf("achievement: integer constant.\n");
     value_t val = {TYPE_INTEGER};
     val.data.integer = integer;
     return val;
@@ -86,8 +97,9 @@ static inline value_t c_const_string_init(string_t *string, size_t length, const
 {
     value_t val   = {TYPE_STRING};
     val.data.string = string;
-    string->length = length;
+    string->length = length + 1;
     memcpy(string->data, data, length);
+    string->data[length] = 0;
     return val;
 }
 
@@ -118,7 +130,6 @@ static inline value_t c_const_string_init(string_t *string, size_t length, const
  */
 static inline value_t c_get_argument(argv_t* args, int index)
 {
-    printf("achievement: argumentative.\n");
     value_t val = {TYPE_NULL, 0};
     if (index < args->valz) val = args->val[index];
     return val;
@@ -132,52 +143,6 @@ static inline void c_call(argv_t* args)
     closure->code(closure, args);
 }
 
-static void c_quit(closure_t *clos, argv_t *args)
-{
-    printf("achievement: quitter.\n");
-    exit(0);
-}
-
-value_t cl_file_write;
-value_t v_stdin, v_stdout, v_stderr;
-
-static void sys_file_write(closure_t *clos, argv_t *args)
-{
-    printf("achievement: file write\n");
-    value_t cont = c_get_argument(args, 1);
-    value_t data = c_get_argument(args, 2);
-    value_t fd   = c_get_argument(args, 3);
-    assert (data.type == TYPE_STRING);
-    assert (fd.type == TYPE_INTEGER);
-
-    c_call_begin(2);
-    c_call_argument(0, cont);
-    c_call_argument(1, c_const_integer(write(
-        fd.data.integer,
-        data.data.string->data,
-        data.data.string->length)));
-    c_call_end();
-}
-
-static inline void c_boot(code_t entry)
-{
-    closure_t closure = {entry,  0};
-    closure_t cont    = {c_quit, 0}; 
-
-    closure_t file_write = {sys_file_write, 0};
-
-    cl_file_write = c_const_closure(&file_write);
-    v_stdin  = c_const_integer(0);
-    v_stdout = c_const_integer(1);
-    v_stderr = c_const_integer(2);
-
-    printf("achievement: bootup\n");
-    c_call_begin(2);
-    c_call_argument(0, c_const_closure(&closure));
-    c_call_argument(1, c_const_closure(&cont));
-    c_call_end();
-}
-
 static inline value_t* c_slot(closure_t *closure, long index)
 {
     return closure->slot[index];
@@ -187,3 +152,15 @@ static inline void c_closure_lift(closure_t *closure, long index, value_t* slot)
 {
     closure->slot[index] = slot;
 }
+
+value_t cl_pick,
+        cl_arraybuffer,
+        cl_file_open,
+        cl_file_close,
+        cl_file_read,
+        cl_file_write,
+        v_stdin,
+        v_stdout,
+        v_stderr;
+
+void c_boot(code_t entry);

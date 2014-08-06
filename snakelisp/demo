@@ -1,1 +1,7 @@
-(file-write "hello hello\n" stdout)
+(fd    = (file-open "demo"))
+(buf   = (arraybuffer 4096))
+(count = (file-read fd buf))
+(file-close fd)
+(file-write stdout buf count)
+(file-write stdout "hello hello\n")
+# TODO: implement cond

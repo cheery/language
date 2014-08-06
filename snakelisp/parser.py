@@ -131,7 +131,7 @@ def isnum(ch):
     return ch.isdigit()
 
 def isspace(ch):
-    return ch == ' '
+    return ch.isspace()
 
 def make_integer(string):
     digits = '0' + string[2:]
