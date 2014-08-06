@@ -102,8 +102,8 @@ def collect_scopevars(scopevars, obj):
             return scopevars[obj]
         inscope = collect_scopevars(scopevars, obj.body)
         for var, val in reversed(obj.motion):
-            inscope.discard(var)
             inscope |= collect_scopevars(scopevars, val)
+            inscope.discard(var)
         for var in obj:
             inscope.discard(var)
         scopevars[obj] = inscope

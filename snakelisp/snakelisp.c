@@ -31,7 +31,6 @@ static CONTINUATION(file_open)
 {
     int fd;
     string_t *path = ARG_STRING(2);
-    printf("achievement: file open %s\n", path->data);
     fd = open(path->data, O_RDONLY);
     call(ARG(1), boxInteger(fd));
 }
@@ -44,7 +43,6 @@ static CONTINUATION(file_close)
 
 static CONTINUATION(file_read)
 {
-    printf("achievement: file read\n");
     int fd = ARG_INTEGER(2);
     arraybuffer_t *buffer = ARG_ARRAYBUFFER(3);
     size_t count = buffer->length;
@@ -55,7 +53,6 @@ static CONTINUATION(file_read)
 
 static CONTINUATION(file_write)
 {
-    printf("achievement: file write\n");
     int fd = ARG_INTEGER(2);
     size_t count;
     void  *data;

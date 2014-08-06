@@ -73,6 +73,8 @@ def continuate(mks, expr, env):
         return genpick(mks, cond, a, b, env)
     if ismacro(expr, 'cond'):
         return build_cond(mks, expr[1:], env)
+    if ismacro(expr, 'while'):
+        return build_while(mks, expr, env)
     if ismacro(expr, 'func'):
         env = env.new_environ()
         ret = env.new_argument('cont', False)
@@ -123,6 +125,31 @@ def build_cond(mks, exprs, env):
         b    = Lambda([cont], compose(cmks, Call([cont, val])))
         return genpick(mks, cond, a, b, env)
     return retval
+
+def build_while(mks, exprs, env):
+    exit = nullfunc()
+    self = Variable()
+    cond = exprs[1]
+
+    body = exprs[2:]
+    lmks = []
+    val  = null
+    for expr in body:
+        val = continuate(lmks, expr, env)
+    cc = continuate(lmks, cond, env)
+
+    cn = continuate(mks, cond, env)
+    retval = Variable()
+    lcont  = Variable()
+    mks.append(lambda cont: Assign(
+        self,
+        Lambda([lcont], compose(lmks, Call([env.new_implicit('pick'), lcont, cc, self, exit]))),
+        Call([env.new_implicit('pick'), Lambda([retval], cont), cn, self, exit])))
+    return retval
+
+def nullfunc():
+    cont = Variable()
+    return Lambda([cont], Call([cont, null]))
 
 def enclose(exprs, env):
     cont = Variable()
