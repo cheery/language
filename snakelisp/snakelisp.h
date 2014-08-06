@@ -12,19 +12,19 @@
 #define ARG_ERROR(index, expected) \
     assert(-1 == index);
 #define ARG_CLOSURE(index) \
-    ({ value_t a = ARG(index); if(!isClosure(a)) ARG_ERROR(index, "closure"); unboxClosure(a)})
+    ({ value_t a = ARG(index); if(!isClosure(a)) ARG_ERROR(index, "closure"); unboxClosure(a);})
 #define ARG_BOOLEAN(index) \
-    ({ value_t a = ARG(index); if(!isBoolean(a)) ARG_ERROR(index, "boolean"); unboxBoolean(a)})
+    ({ value_t a = ARG(index); if(!isBoolean(a)) ARG_ERROR(index, "boolean"); unboxBoolean(a);})
 #define ARG_INTEGER(index) \
-    ({ value_t a = ARG(index); if(!isInteger(a)) ARG_ERROR(index, "integer"); unboxInteger(a)})
+    ({ value_t a = ARG(index); if(!isInteger(a)) ARG_ERROR(index, "integer"); unboxInteger(a);})
 #define ARG_DOUBLE(index) \
-    ({ value_t a = ARG(index); if(!isDouble(a) && !isInteger(a)) ARG_ERROR(index, "double"); unboxDouble(a)})
+    ({ value_t a = ARG(index); if(!isDouble(a) && !isInteger(a)) ARG_ERROR(index, "double"); unboxDouble(a);})
 #define ARG_STRING(index) \
-    ({ value_t a = ARG(index); if(!isString(a)) ARG_ERROR(index, "string"); unboxString(a)})
+    ({ value_t a = ARG(index); if(!isString(a)) ARG_ERROR(index, "string"); unboxString(a);})
 #define ARG_ARRAYBUFFER(index) \
-    ({ value_t a = ARG(index); if(!isArrayBuffer(a)) ARG_ERROR(index, "arraybuffer"); unboxArrayBuffer(a)})
+    ({ value_t a = ARG(index); if(!isArrayBuffer(a)) ARG_ERROR(index, "arraybuffer"); unboxArrayBuffer(a);})
 #define ARG_ARRAY(index) \
-    ({ value_t a = ARG(index); if(!isArray(a)) ARG_ERROR(index, "array"); unboxArray(a)})
+    ({ value_t a = ARG(index); if(!isArray(a)) ARG_ERROR(index, "array"); unboxArray(a);})
 
 
 //remove: typedef struct argv         argv_t;

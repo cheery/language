@@ -1,145 +1,79 @@
 #include "snakelisp.h"
 #include <stdio.h>
-//#include <sys/types.h>
-//#include <sys/stat.h>
-//#include <fcntl.h>
-//
-//#define CONTINUATION(x) static void x(closure_t *clos, argv_t *args)
-//
-//static inline long unbox_integer(value_t value)
-//{
-//    assert(value.type == TYPE_INTEGER);
-//    return value.data.integer;
-//}
-//
-//CONTINUATION(c_quit)
-//{
-//    printf("achievement: quitter.\n");
-//    exit(0);
-//}
-//
-//CONTINUATION(c_pick)
-//{
-//    value_t cont = c_get_argument(args, 1);
-//    value_t cond = c_get_argument(args, 2);
-//    value_t yes = c_get_argument(args, 3);
-//    value_t no  = c_get_argument(args, 4);
-//
-//    c_call_begin(2);
-//    if (cond.type == TYPE_NULL || (cond.type == TYPE_BOOLEAN && cond.data.integer == 0))
-//    {
-//        c_call_argument(0, no);
-//    }
-//    else
-//    {
-//        c_call_argument(0, yes);
-//    }
-//    c_call_argument(1, cont);
-//    c_call_end();
-//}
-//
-//CONTINUATION(c_arraybuffer)
-//{
-//    value_t cont = c_get_argument(args, 1);
-//    size_t  size = unbox_integer(c_get_argument(args, 2));
-//    value_t a = {TYPE_ARRAYBUFFER};
-//    a.data.arraybuffer = alloca(sizeof(arraybuffer_t) + sizeof(uint8_t)*size);
-//    a.data.arraybuffer->length = size;
-//    memset(a.data.arraybuffer->data, 0, a.data.arraybuffer->length);
-//    c_call_begin(2);
-//    c_call_argument(0, cont);
-//    c_call_argument(1, a);
-//    c_call_end();
-//}
-//
-//CONTINUATION(c_file_open)
-//{
-//    value_t cont = c_get_argument(args, 1);
-//    value_t path = c_get_argument(args, 2);
-//    int fd;
-//    assert (TYPE_STRING == path.type);
-//    printf("achievement: file open %s\n", path.data.string->data);
-//    fd = open(path.data.string->data, O_RDONLY);
-//    c_call_begin(2);
-//    c_call_argument(0, cont);
-//    if (fd < 0)
-//    {
-//        c_call_argument(1, c_const_null());
-//    }
-//    else
-//    {
-//        c_call_argument(1, c_const_integer(fd));
-//    }
-//    c_call_end();
-//}
-//
-//CONTINUATION(c_file_close)
-//{
-//    value_t cont   = c_get_argument(args, 1);
-//    value_t fileno = c_get_argument(args, 2);
-//    printf("achievement: file close\n");
-//    assert (fileno.type == TYPE_INTEGER);
-//    close(fileno.data.integer);
-//    c_call_begin(2);
-//    c_call_argument(0, cont);
-//    c_call_argument(1, c_const_null());
-//    c_call_end();
-//}
-//
-//CONTINUATION(c_file_read)
-//{
-//    printf("achievement: file read\n");
-//    value_t cont   = c_get_argument(args, 1);
-//    value_t fileno = c_get_argument(args, 2);
-//    value_t data   = c_get_argument(args, 3);
-//    value_t coun   = c_get_argument(args, 4);
-//    assert (fileno.type == TYPE_INTEGER);
-//    assert (data.type   == TYPE_ARRAYBUFFER);
-//    size_t size = data.data.arraybuffer->length;
-//    if (coun.type != TYPE_NULL)
-//    {
-//        assert(coun.type == TYPE_INTEGER);
-//        size = coun.data.integer;
-//    }
-//    c_call_begin(2);
-//    c_call_argument(0, cont);
-//    c_call_argument(1, c_const_integer(read(fileno.data.integer, data.data.arraybuffer->data, size)));
-//    c_call_end();
-//}
-//
-//CONTINUATION(c_file_write)
-//{
-//    printf("achievement: file write\n");
-//    value_t cont = c_get_argument(args, 1);
-//    value_t fd   = c_get_argument(args, 2);
-//    value_t data = c_get_argument(args, 3);
-//    value_t coun = c_get_argument(args, 4);
-//    size_t size;
-//    void  *buff;
-//    if (data.type == TYPE_STRING)
-//    {
-//        size = data.data.string->length;
-//        buff = data.data.string->data;
-//    }
-//    else
-//    {
-//        assert (data.type == TYPE_ARRAYBUFFER);
-//        size = data.data.arraybuffer->length;
-//        buff = data.data.arraybuffer->data;
-//    }
-//    assert (fd.type == TYPE_INTEGER);
-//    if (coun.type != TYPE_NULL)
-//    {
-//        assert(coun.type == TYPE_INTEGER);
-//        size = coun.data.integer;
-//    }
-//
-//    c_call_begin(2);
-//    c_call_argument(0, cont);
-//    c_call_argument(1, c_const_integer(write(fd.data.integer, buff, size)));
-//    c_call_end();
-//}
-//
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+static CONTINUATION(pick)
+{
+    value_t cond = ARG(2);
+    if (isFalse(cond) || isNull(cond))
+    {
+        call(ARG(4), ARG(1));
+    }
+    else
+    {
+        call(ARG(3), ARG(1));
+    }
+}
+
+static CONTINUATION(new_arraybuffer)
+{
+    call(ARG(1), boxArrayBuffer(newArrayBuffer(ARG_INTEGER(2))));
+}
+
+static CONTINUATION(file_open)
+{
+    int fd;
+    string_t *path = ARG_STRING(2);
+    printf("achievement: file open %s\n", path->data);
+    fd = open(path->data, O_RDONLY);
+    call(ARG(1), boxInteger(fd));
+}
+
+static CONTINUATION(file_close)
+{
+    close(ARG_INTEGER(2));
+    call(ARG(1), boxNull());
+}
+
+static CONTINUATION(file_read)
+{
+    printf("achievement: file read\n");
+    int fd = ARG_INTEGER(2);
+    arraybuffer_t *buffer = ARG_ARRAYBUFFER(3);
+    size_t count = buffer->length;
+    if (argc > 4) count = ARG_INTEGER(4);
+
+    call(ARG(1), boxInteger(read(fd, buffer->data, count)));
+}
+
+CONTINUATION(file_write)
+{
+    printf("achievement: file write\n");
+    int fd = ARG_INTEGER(2);
+    size_t count;
+    void  *data;
+    if (isArrayBuffer(ARG(3)))
+    {
+        arraybuffer_t *arraybuffer = unboxArrayBuffer(ARG(3));
+        data  = arraybuffer->data;
+        count = arraybuffer->length;
+    }
+    else if (isString(ARG(3)))
+    {
+        string_t *string = unboxString(ARG(3));
+        data  = string->data;
+        count = string->length;
+    }
+    else
+    {
+        ARG_ERROR(3, "arraybuffer or string");
+    }
+    if (argc > 4) count = ARG_INTEGER(4);
+    call(ARG(1), boxInteger(write(fd, data, count)));
+}
+
 //CONTINUATION(c_length)
 //{
 //    value_t cont = c_get_argument(args, 1);
@@ -268,6 +202,12 @@
 //    c_call_end();
 //}
 value_t
+    v_pick,
+    v_arraybuffer,
+    v_file_read,
+    v_file_write,
+    v_file_open,
+    v_file_close,
     v_stdin,
     v_stdout,
     v_stderr;
@@ -281,6 +221,13 @@ static CONTINUATION(quit)
 
 void snakeBoot(value_t entry)
 {
+    v_pick = spawnClosure(pick);
+    v_arraybuffer = spawnClosure(new_arraybuffer);
+
+    v_file_read  = spawnClosure(file_read);
+    v_file_write = spawnClosure(file_write);
+    v_file_open  = spawnClosure(file_open);
+    v_file_close = spawnClosure(file_close);
     v_stdin  = boxInteger(0);
     v_stdout = boxInteger(1);
     v_stderr = boxInteger(2);

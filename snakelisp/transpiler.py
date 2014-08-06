@@ -6,7 +6,7 @@ def transpile(lamb, extra_headers=(), sourcename="<noname>"):
     scopevars = {}
     collect_scopevars(scopevars, lamb)
     lines = [
-        '/* generated from file {} */'.format(sourcename),
+        '/* generated from: {} */'.format(sourcename),
         '#include "snakelisp.h"',
         ""]
     lines.extend(extra_headers)
