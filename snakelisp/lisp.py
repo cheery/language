@@ -20,19 +20,20 @@ def main():
     program = program.coalesce()
 
     c_api = {
-        "pick": "&cl_pick",
-        "arraybuffer": "&cl_arraybuffer",
-        "file-open":  "&cl_file_open",
-        "file-close": "&cl_file_close",
-        "file-read":  "&cl_file_read",
-        "file-write": "&cl_file_write",
-        "stdin":  "&v_stdin",
-        "stdout": "&v_stdout",
-        "stderr": "&v_stderr",
+        "pick":        "&v_pick",
+        "arraybuffer": "&v_arraybuffer",
+        "file-open":   "&v_file_open",
+        "file-close":  "&v_file_close",
+        "file-read":   "&v_file_read",
+        "file-write":  "&v_file_write",
+        "stdin":       "&v_stdin",
+        "stdout":      "&v_stdout",
+        "stderr":      "&v_stderr",
     }
+    cdefns = ["extern value_t {};".format(value[1:]) for name, value in c_api.items()]
     for var in env.seal():
         var.c_handle = c_api[var.name]
-    source = transpiler.transpile(program)
+    source = transpiler.transpile(program, cdefns, "demo")
     open('demo.c', 'w').write(source)
     subprocess.call(["gcc", "demo.c", "snakelisp.c"])
 

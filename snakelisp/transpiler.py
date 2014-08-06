@@ -1,11 +1,15 @@
 from cps import Call, Lambda, Assign, Variable, Constant, Environ, null, true, false
 
-def transpile(lamb):
+def transpile(lamb, extra_headers=(), sourcename="<noname>"):
     ctx  = Context()
     lambdas = collect_lambdas(set(), lamb)
     scopevars = {}
     collect_scopevars(scopevars, lamb)
-    lines = ['#include "snakelisp.h"', ""]
+    lines = [
+        '/* generated from file {} */'.format(sourcename),
+        '#include "snakelisp.h"',
+        ""]
+    lines.extend(extra_headers)
     indent = 0 
     def dump(fmt, *args):
         if len(args):
@@ -13,54 +17,49 @@ def transpile(lamb):
         else:
             lines.append(" "*indent + fmt)
     for func in lambdas:
-        dump("static void {}(closure_t*, argv_t*) c_noreturn;", ctx.fname[func])
+        dump("static CONTINUATION({});", ctx.fname[func])
         func.env = {}
         func.upscope = list(scopevars[func])
         for i, var in enumerate(func.upscope):
-            func.env[var] = "c_slot(closure, {})".format(i)
+            func.env[var] = "SLOT({})".format(i)
 
-    dump("int main(int argc, char** argv)")
+    dump("void main(int argc, char** argv)")
     dump("{")
     indent += 2
-    dump("c_boot({});", ctx.fname[lamb])
-    dump("return 0;")
+    dump("snakeBoot(spawnClosure({}));", ctx.fname[lamb])
     indent -= 2
     dump("}")
     
     for func in lambdas:
         dump("")
-        dump("static void {}(closure_t* closure, argv_t* args)", ctx.fname[func])
+        dump("CONTINUATION({})", ctx.fname[func])
         dump("{")
         indent += 2
 
         for i, arg in enumerate(func):
             func.env[arg] = "&a{}".format(i+1)
-            dump("value_t a{0} = c_get_argument(args, {0});", i+1)
+            dump("value_t a{0} = ARG({0});", i+1)
 
         constants = set(scrape_constants(func))
         for i, const in enumerate(constants):
             name = "c{}".format(i)
             func.env[const] = '&'+name
             if const is None:
-                dump("value_t {} = c_const_null();", name)
+                dump("value_t {} = boxNull();", name)
             elif const is True:
-                dump("value_t {} = c_const_true();", name)
+                dump("value_t {} = boxTrue();", name)
             elif const is False:
-                dump("value_t {} = c_const_false();", name)
+                dump("value_t {} = boxFalse();", name)
             elif isinstance(const, (int, long)):
-                dump("value_t {} = c_const_integer({});", name, const)
+                dump("value_t {} = boxInteger({});", name, const)
+            elif isinstance(const, float):
+                dump("value_t {} = boxDouble({});", name, const)
             elif isinstance(const, (str, unicode)):
-                dump("value_t {} = c_const_string({});", name, const)
+                dump("value_t {} = spawnString({});", name, const)
             else:
                 raise Exception("what is this? {}".format(const))
 
         closures = set(scrape_closures(func))
-        for arg in closures:
-            name  = ctx.fname[arg]
-            cname = 'c'+name
-            vname = 'v'+name
-            dump("c_alloc_closure({}, {}, {}, {});", name, cname, vname, len(arg.upscope))
-            func.env[arg] = '&'+vname
         varnames = []
         for var in set(var for var, value in func.motion):
             if var in func.upscope:
@@ -70,18 +69,18 @@ def transpile(lamb):
             varnames.append(name)
         if varnames:
             dump("value_t {};", ', '.join(varnames))
+        for arg in closures:
+            name  = ctx.fname[arg]
+            vname = 'v'+name
+            dump("value_t {} = spawnClosure({}, {});", vname, name, ', '.join(
+                as_argument(ctx, func, arg)
+                for arg in arg.upscope))
+            func.env[arg] = '&'+vname
         for var, value in func.motion:
             dump("*{} = *{};", as_argument(ctx, func, var), as_argument(ctx, func, value))
-
-        dump("c_call_begin({});", len(func.body))
-        for arg in closures:
-            name = 'c'+ctx.fname[arg]
-            for i, var in enumerate(arg.upscope):
-                dump("c_closure_lift({}, {}, {});".format(name, i, as_argument(ctx, func, var)))
-        for i, arg in enumerate(func.body):
-            dump("c_call_argument({}, *{});", i, as_argument(ctx, func, arg))
-        dump("c_call_end();")
-
+        dump("call({});", ", ".join(
+            "*" + as_argument(ctx, func, arg)
+            for arg in func.body))
         indent = 0
         dump("}")
     return '\n'.join(lines) + '\n'

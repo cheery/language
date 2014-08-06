@@ -1,166 +1,357 @@
-#include <stdlib.h>
 #include <alloca.h>
+#include <stdarg.h>
 #include <stdint.h>
-#include <assert.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
+#define noreturn
+#define CONTINUATION(name) void name(closure_t *frame, size_t argc, value_t *argv)
+#define ARG(index) (index<argc?argv[index]:boxNull())
+#define SLOT(index) (closureSlot(frame, index))
+
+#define ARG_ERROR(index, expected) \
+    assert(-1 == index);
+#define ARG_CLOSURE(index) \
+    ({ value_t a = ARG(index); if(!isClosure(a)) ARG_ERROR(index, "closure"); unboxClosure(a)})
+#define ARG_BOOLEAN(index) \
+    ({ value_t a = ARG(index); if(!isBoolean(a)) ARG_ERROR(index, "boolean"); unboxBoolean(a)})
+#define ARG_INTEGER(index) \
+    ({ value_t a = ARG(index); if(!isInteger(a)) ARG_ERROR(index, "integer"); unboxInteger(a)})
+#define ARG_DOUBLE(index) \
+    ({ value_t a = ARG(index); if(!isDouble(a) && !isInteger(a)) ARG_ERROR(index, "double"); unboxDouble(a)})
+#define ARG_STRING(index) \
+    ({ value_t a = ARG(index); if(!isString(a)) ARG_ERROR(index, "string"); unboxString(a)})
+#define ARG_ARRAYBUFFER(index) \
+    ({ value_t a = ARG(index); if(!isArrayBuffer(a)) ARG_ERROR(index, "arraybuffer"); unboxArrayBuffer(a)})
+#define ARG_ARRAY(index) \
+    ({ value_t a = ARG(index); if(!isArray(a)) ARG_ERROR(index, "array"); unboxArray(a)})
+
+
+//remove: typedef struct argv         argv_t;
 typedef struct value        value_t;
-typedef struct closure      closure_t;
-typedef struct argv         argv_t;
-typedef struct string       string_t;
+typedef struct object       object_t;
+typedef struct array        array_t;
 typedef struct arraybuffer  arraybuffer_t;
-
-typedef void (*code_t)(closure_t*, argv_t*);
+typedef struct closure      closure_t;
+typedef struct string       string_t;
+// integer is long
+// double  is double
+typedef void (*proc_t)(closure_t* frame, size_t argc, value_t *argv) noreturn;
 
 /*
- * This is a bit complex. This is a value cell.
- * A slot is a single value cell somewhere.
+ * value cell.
  */
 struct value
 {
     uint8_t type;
     union {
-        long            integer;
-        string_t        *string;
-        closure_t       *closure;
-        arraybuffer_t   *arraybuffer;
-    } data;
+        long        integer;
+        double      real;
+        object_t   *object;
+        void*       address;
+    } a;
 };
-#define TYPE_NULL    0
-#define TYPE_BOOLEAN 1
-#define TYPE_INTEGER 2
-#define TYPE_STRING  3
-#define TYPE_ARRAYBUFFER  4
-#define TYPE_ARRAY   127
-#define TYPE_CLOSURE 128
 
+#define TYPE_CLOSURE     0
+#define TYPE_BOOLEAN     1
+#define TYPE_INTEGER     2
+#define TYPE_DOUBLE      3
+#define TYPE_STRING      4
+#define TYPE_ARRAYBUFFER 5
+#define TYPE_ARRAY       7
 
-/*
- * Some basic data types compose complex data types.
- */
-struct string
+//remove: struct argv
+//remove: {
+//remove:    size_t      length;
+//remove:    value_t     val[];
+//remove: };
+
+struct object
 {
-    size_t  length;
-    char    data[];
+};
+
+struct array
+{
+    object_t    object;
+    value_t     interface;
+    size_t      length;
+    value_t     val[];
 };
 
 struct arraybuffer
 {
-    size_t  length;
-    uint8_t data[];
+    object_t    object;
+    size_t      length;
+    uint8_t     data[];
 };
-
-/*
- * This is pass by value system, so the argument list is itself
- * sequence of slots.
- *
- * The closure is a sequence of pointers to slots.
- */
 
 struct closure
 {
-    code_t   code;
-    size_t   slotz;
-    value_t* slot[];
+    object_t    object;
+    proc_t      proc;
+    size_t      length;
+    value_t*    slot[];
 };
 
-struct argv
+struct string
 {
-    size_t   valz;
-    value_t  val[];
+    object_t    object;
+    size_t      byteLength;
+    size_t      length;
+    uint8_t     data[];
 };
 
-static inline value_t c_const_null()
+static inline value_t boxNull()
 {
-    value_t val = {TYPE_NULL, 0};
-    return val;
+    value_t value   = {TYPE_CLOSURE};
+    value.a.address = NULL;
+    return value;
 }
 
-static inline value_t c_const_integer(long integer)
+static inline value_t boxTrue()
 {
-    value_t val = {TYPE_INTEGER};
-    val.data.integer = integer;
-    return val;
+    value_t value   = {TYPE_BOOLEAN};
+    value.a.integer = (1==1);
+    return value;
 }
 
-static inline value_t c_const_closure(closure_t *closure)
+static inline value_t boxFalse()
 {
-    printf("achievement: closure constant %p\n", closure);
-    value_t val = {TYPE_CLOSURE};
-    val.data.closure = closure;
-    return val;
+    value_t value   = {TYPE_BOOLEAN};
+    value.a.integer = (1==2);
+    return value;
 }
 
-static inline value_t c_const_string_init(string_t *string, size_t length, const char *data)
+static inline value_t boxBoolean(long integer)
 {
-    value_t val   = {TYPE_STRING};
-    val.data.string = string;
-    string->length = length + 1;
-    memcpy(string->data, data, length);
-    string->data[length] = 0;
-    return val;
+    value_t value   = {TYPE_BOOLEAN};
+    value.a.integer = integer;
+    return value;
 }
 
-// some implementations might refuse to inline the function if it uses alloca
-#define c_const_string(x) c_const_string_init(alloca(sizeof(string_t) + sizeof(char)*(strlen(x)+1)), strlen(x), x);
+static inline value_t boxInteger(long integer)
+{
+    value_t value   = {TYPE_INTEGER};
+    value.a.integer = integer;
+    return value;
+}
 
-// for now not sure how it enforces.
-#define c_noreturn
+static inline value_t boxDouble(double real)
+{
+    value_t value   = {TYPE_DOUBLE};
+    value.a.real    = real;
+    return value;
+}
 
-#define c_alloc_closure(name, cname, vname, count) \
-    closure_t *cname = alloca(sizeof(closure_t) + sizeof(value_t*)*count); \
-    cname->code   = name; \
-    cname->slotz  = count; \
-    value_t vname = c_const_closure(cname);
+static inline value_t boxArray(array_t *array)
+{
+    value_t value   = {TYPE_ARRAY};
+    value.a.address = array;
+    return value;
+}
 
-#define c_call_begin(arity) \
-    argv_t *argv = alloca(sizeof(argv_t) + sizeof(value_t)*arity); \
-    argv->valz   = arity;
+static inline value_t boxArrayBuffer(arraybuffer_t *array)
+{
+    value_t value   = {TYPE_ARRAYBUFFER};
+    value.a.address = array;
+    return value;
+}
 
-#define c_call_argument(index, value) \
-    argv->val[index] = value;
+static inline value_t boxClosure(closure_t *closure)
+{
+    value_t value   = {TYPE_CLOSURE};
+    value.a.address = closure;
+    return value;
+}
 
-// nothing for now. :)
-#define c_call_end() c_call(argv);
+static inline value_t boxString(string_t *string)
+{
+    value_t value   = {TYPE_STRING};
+    value.a.address = string;
+    return value;
+}
+
+static inline long isNull(value_t value)
+{
+    return value.type == TYPE_CLOSURE && value.a.address == NULL;
+}
+
+static inline long isBoolean(value_t value)
+{
+    return value.type == TYPE_BOOLEAN;
+}
+
+static inline long isTrue(value_t value)
+{
+    return value.type == TYPE_BOOLEAN && value.a.integer;
+}
+
+static inline long isFalse(value_t value)
+{
+    return value.type == TYPE_BOOLEAN && !value.a.integer;
+}
+
+static inline long isInteger(value_t value)
+{
+    return value.type == TYPE_INTEGER;
+}
+
+static inline long isDouble(value_t value)
+{
+    return value.type == TYPE_DOUBLE;
+}
+
+static inline long isArray(value_t value)
+{
+    return value.type == TYPE_ARRAY;
+}
+
+static inline long isArrayBuffer(value_t value)
+{
+    return value.type == TYPE_ARRAYBUFFER;
+}
+
+static inline long isClosure(value_t value)
+{
+    return value.type == TYPE_CLOSURE && value.a.address != NULL;
+}
+
+static inline long isString(value_t value)
+{
+    return value.type == TYPE_STRING;
+}
+
+static inline array_t *initArray(array_t *array, size_t length)
+{
+    size_t i;
+    array->length = length;
+    for (i = 0; i < length; i++) array->val[i] = boxNull();
+    return array;
+}
+
+static inline arraybuffer_t *initArrayBuffer(arraybuffer_t *array, size_t length)
+{
+    size_t i;
+    array->length = length;
+    for (i = 0; i < length; i++) array->data[i] = 0;
+    return array;
+}
 
 /*
- * Arguments are unpacked before used, so we can verify it has a slot even if callee gave too few arguments. 
+ * invariant: every cell is subsequently filled with unique slot.
  */
-static inline value_t c_get_argument(argv_t* args, int index)
+static inline closure_t *initClosure(closure_t *closure, proc_t proc, size_t length, value_t* slot[])
 {
-    value_t val = {TYPE_NULL, 0};
-    if (index < args->valz) val = args->val[index];
-    return val;
+    size_t i;
+    closure->proc   = proc;
+    closure->length = length;
+    if (slot) for (i = 0; i < length; i++) closure->slot[i] = slot[i];
+    return closure;
 }
 
-static inline void c_call(argv_t* args)
+static inline string_t *initString(string_t *string, size_t length, const char *data)
 {
-    closure_t* closure = args->val[0].data.closure;
-    printf("achievement: call %p\n", closure);
-    assert (args->val[0].type == TYPE_CLOSURE);
-    closure->code(closure, args);
+    size_t i;
+    string->byteLength = length+1;
+    string->length = length;
+    for (i = 0; i < length; i++) string->data[i] = data[i];
+    string->data[length] = 0;
+    return string;
 }
 
-static inline value_t* c_slot(closure_t *closure, long index)
+/*
+ * invariant: type is checked before these are used.
+ */
+static inline long unboxBoolean(value_t value)
+{
+    return value.a.integer;
+}
+
+static inline long unboxInteger(value_t value)
+{
+    return value.a.integer;
+}
+
+static inline double unboxDouble(value_t value)
+{
+    if (isInteger(value)) return (double)value.a.integer; // implicit coercion
+    return value.a.real;
+}
+
+static inline array_t* unboxArray(value_t value)
+{
+    return value.a.address;
+}
+
+static inline arraybuffer_t* unboxArrayBuffer(value_t value)
+{
+    return value.a.address;
+}
+
+static inline closure_t* unboxClosure(value_t value)
+{
+    return value.a.address;
+}
+
+static inline string_t* unboxString(value_t value)
+{
+    return value.a.address;
+}
+
+/*
+ * invariant: continuations never return
+ */
+#define allocav(x, y, n)    (alloca(sizeof(x) + sizeof(y)*(n)))
+#define newArray(n)         (initArray(allocav(array_t, value_t, n), n))
+#define newArrayBuffer(n)   (initArrayBuffer(allocav(arraybuffer_t, uint8_t, n), n))
+#define newCString(x)       (initString(allocav(string_t, char, strlen(x)+1), strlen(x), x))
+#define newString(l, x)     (initString(allocav(string_t, char, l+1), l, x))
+
+#define spawnString(x)      (boxString(newCString(x)))
+#define spawnClosure(proc, slots...) ({ \
+        value_t* _slots[] = {slots}; \
+        size_t   n = sizeof(_slots) / sizeof(value_t*); \
+        boxClosure(initClosure(allocav(closure_t, value_t*, n), proc, n, _slots)); \
+        })
+
+#define call(args...) ({ \
+    value_t _args[] = {args}; \
+    snakeCall(sizeof(_args)/sizeof(value_t), _args); \
+    })
+
+//static inline void snakeCall(size_t argc, value_t *args) c_noreturn;
+
+
+/*
+ * invariant: errors go into debugger, so assert.h will fuck off very soon.
+ */
+#include <assert.h>
+
+/*
+ * invariant: we have at least a callee.
+ */
+static inline void snakeCall(size_t argc, value_t *argv)
+{
+    if (isClosure(argv[0]))
+    {
+        closure_t *frame = unboxClosure(argv[0]);
+        frame->proc(frame, argc, argv);
+    }
+    else
+    {
+        ARG_ERROR(0, "closure");
+    }
+}
+
+/*
+ * invariant: the sources alter the slots only through these functions.
+ */
+static inline value_t* closureSlot(closure_t *closure, size_t index)
 {
     return closure->slot[index];
-}
+} 
 
-static inline void c_closure_lift(closure_t *closure, long index, value_t* slot)
-{
-    closure->slot[index] = slot;
-}
-
-value_t cl_pick,
-        cl_arraybuffer,
-        cl_file_open,
-        cl_file_close,
-        cl_file_read,
-        cl_file_write,
-        v_stdin,
-        v_stdout,
-        v_stderr;
-
-void c_boot(code_t entry);
+/*
+ * invariant: we <3 puns.
+ */
+void snakeBoot(value_t entry);

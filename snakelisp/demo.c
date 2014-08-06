@@ -1,106 +1,77 @@
+/* generated from file demo */
 #include "snakelisp.h"
 
-static void f101(closure_t*, argv_t*) c_noreturn;
-static void f102(closure_t*, argv_t*) c_noreturn;
-static void f103(closure_t*, argv_t*) c_noreturn;
-static void f104(closure_t*, argv_t*) c_noreturn;
-static void f105(closure_t*, argv_t*) c_noreturn;
-static void f106(closure_t*, argv_t*) c_noreturn;
-int main(int argc, char** argv)
+extern value_t v_file_read;
+extern value_t v_stdout;
+extern value_t v_stderr;
+extern value_t v_file_open;
+extern value_t v_pick;
+extern value_t v_arraybuffer;
+extern value_t v_stdin;
+extern value_t v_file_write;
+extern value_t v_file_close;
+static CONTINUATION(f101);
+static CONTINUATION(f102);
+static CONTINUATION(f103);
+static CONTINUATION(f104);
+static CONTINUATION(f105);
+static CONTINUATION(f106);
+void main(int argc, char** argv)
 {
-  c_boot(f104);
-  return 0;
+  snakeBoot(spawnClosure(f103));
 }
 
-static void f101(closure_t* closure, argv_t* args)
+CONTINUATION(f101)
 {
-  value_t a1 = c_get_argument(args, 1);
-  c_alloc_closure(f105, cf105, vf105, 3);
+  value_t a1 = ARG(1);
   value_t v101;
+  value_t vf105 = spawnClosure(f105, SLOT(0), SLOT(1), &v101);
   *&v101 = *&a1;
-  c_call_begin(4);
-  c_closure_lift(cf105, 0, &v101);
-  c_closure_lift(cf105, 1, c_slot(closure, 0));
-  c_closure_lift(cf105, 2, c_slot(closure, 1));
-  c_call_argument(0, *&cl_file_read);
-  c_call_argument(1, *&vf105);
-  c_call_argument(2, *c_slot(closure, 0));
-  c_call_argument(3, *&v101);
-  c_call_end();
+  call(*&v_file_read, *&vf105, *SLOT(1), *&v101);
 }
 
-static void f102(closure_t* closure, argv_t* args)
+CONTINUATION(f102)
 {
-  value_t a1 = c_get_argument(args, 1);
-  value_t c0 = c_const_integer(4096);
-  c_alloc_closure(f101, cf101, vf101, 2);
-  value_t v102;
-  *&v102 = *&a1;
-  c_call_begin(3);
-  c_closure_lift(cf101, 0, &v102);
-  c_closure_lift(cf101, 1, c_slot(closure, 0));
-  c_call_argument(0, *&cl_arraybuffer);
-  c_call_argument(1, *&vf101);
-  c_call_argument(2, *&c0);
-  c_call_end();
+  value_t a1 = ARG(1);
+  value_t vf106 = spawnClosure(f106, SLOT(0));
+  call(*&v_file_write, *&vf106, *&v_stdout, *SLOT(1), *SLOT(2));
 }
 
-static void f103(closure_t* closure, argv_t* args)
+CONTINUATION(f103)
 {
-  value_t a1 = c_get_argument(args, 1);
-  c_alloc_closure(f106, cf106, vf106, 1);
-  c_call_begin(5);
-  c_closure_lift(cf106, 0, c_slot(closure, 1));
-  c_call_argument(0, *&cl_file_write);
-  c_call_argument(1, *&vf106);
-  c_call_argument(2, *&v_stdout);
-  c_call_argument(3, *c_slot(closure, 0));
-  c_call_argument(4, *c_slot(closure, 2));
-  c_call_end();
-}
-
-static void f104(closure_t* closure, argv_t* args)
-{
-  value_t a1 = c_get_argument(args, 1);
-  value_t c0 = c_const_string("demo");
-  value_t c1 = c_const_null();
-  c_alloc_closure(f102, cf102, vf102, 1);
-  value_t v101, v102, v103;
-  *&v102 = *&c1;
-  *&v101 = *&c1;
+  value_t a1 = ARG(1);
+  value_t c0 = spawnString("demo");
+  value_t c1 = boxNull();
+  value_t v102, v103, v101;
+  value_t vf104 = spawnClosure(f104, &a1);
   *&v103 = *&c1;
-  c_call_begin(3);
-  c_closure_lift(cf102, 0, &a1);
-  c_call_argument(0, *&cl_file_open);
-  c_call_argument(1, *&vf102);
-  c_call_argument(2, *&c0);
-  c_call_end();
+  *&v101 = *&c1;
+  *&v102 = *&c1;
+  call(*&v_file_open, *&vf104, *&c0);
 }
 
-static void f105(closure_t* closure, argv_t* args)
+CONTINUATION(f104)
 {
-  value_t a1 = c_get_argument(args, 1);
-  c_alloc_closure(f103, cf103, vf103, 3);
+  value_t a1 = ARG(1);
+  value_t c0 = boxInteger(4096);
   value_t v103;
+  value_t vf101 = spawnClosure(f101, SLOT(0), &v103);
   *&v103 = *&a1;
-  c_call_begin(3);
-  c_closure_lift(cf103, 0, c_slot(closure, 0));
-  c_closure_lift(cf103, 1, c_slot(closure, 2));
-  c_closure_lift(cf103, 2, &v103);
-  c_call_argument(0, *&cl_file_close);
-  c_call_argument(1, *&vf103);
-  c_call_argument(2, *c_slot(closure, 1));
-  c_call_end();
+  call(*&v_arraybuffer, *&vf101, *&c0);
 }
 
-static void f106(closure_t* closure, argv_t* args)
+CONTINUATION(f105)
 {
-  value_t a1 = c_get_argument(args, 1);
-  value_t c0 = c_const_string("hello hello\n");
-  c_call_begin(4);
-  c_call_argument(0, *&cl_file_write);
-  c_call_argument(1, *c_slot(closure, 0));
-  c_call_argument(2, *&v_stdout);
-  c_call_argument(3, *&c0);
-  c_call_end();
+  value_t a1 = ARG(1);
+  value_t v102;
+  value_t vf102 = spawnClosure(f102, SLOT(0), SLOT(2), &v102);
+  *&v102 = *&a1;
+  call(*&v_file_close, *&vf102, *SLOT(1));
+}
+
+CONTINUATION(f106)
+{
+  value_t a1 = ARG(1);
+  value_t c0 = spawnString("hello hello\n");
+  call(*&v_file_write, *SLOT(0), *&v_stdout, *&c0);
 }
