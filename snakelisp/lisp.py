@@ -140,6 +140,7 @@ def build_while(mks, exprs, env):
     self = Variable()
     cond = exprs[1]
 
+    cn = continuate(mks, cond, env)
     body = exprs[2:]
     lmks = []
     val  = null
@@ -147,7 +148,6 @@ def build_while(mks, exprs, env):
         val = continuate(lmks, expr, env)
     cc = continuate(lmks, cond, env)
 
-    cn = continuate(mks, cond, env)
     retval = Variable()
     lcont  = Variable()
     mks.append(lambda cont: Assign(

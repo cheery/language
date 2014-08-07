@@ -1,73 +1,26 @@
-(print = (func (line)
-    (file-write stdout (cat line "\n"))))
-
+# #(print = (func (line)
+# #    (file-write stdout (cat line "\n"))))
+# 
 (fd = (file-open "demo"))
-(buffer = (arraybuffer 128))
-(count = (file-read fd buffer))
-
-(while (lt 0 count)
-    (file-write stdout buffer count)
-    (count = (file-read fd buffer))
-    (print "read cycle"))
-
-(print "done")
+(buffer = (arraybuffer 262))
+# 
+# # works
+# #(rw = (func ()
+# #    (count = (file-read fd buffer))
+# #    (cond
+# #        ((lt 0 count)
+# #            (file-write stdout buffer count)
+# #            (rw)))))
+# #(rw)
+# 
+# produces error
+(while (lt 0 (count = (file-read fd buffer)))
+    (file-write stdout buffer count))
+# 
+## works now
+#(count = (file-read fd buffer))
+#(while (lt 0 count)
+#    (file-write stdout buffer count)
+#    (count = (file-read fd buffer)))
+# 
 (file-close fd)
-
-
-#(i = 0)
-#(while (lt i 10)
-#    (print "beer on the wall")
-#    (i = (+ i 1)))
-#
-#(print (and true true))
-#(print (or true false))
-
-
-#(snap = (func (a b c..)
-#    (a c..)))
-
-
-
-## (fd    = (file-open "demo"))
-## (buf   = (arraybuffer 4096))
-## (count = (file-read fd buf))
-## (file-write stdout buf count)
-## (file-write stdout "hello hello\n")
-## 
-## 
-## (print "hello snake")
-## 
-## 
-## (if false
-##     (print "can't be!")
-##     (print "maybe!"))
-## 
-## (if true
-##     (print "yes.")
-##     (print "no."))
-## 
-## (if (null? (cond))
-##     (print "sad cond :<") null)
-## 
-## (cond
-##     (else
-##         (print "odd cond. :>")))
-## 
-## (cond
-##     ((null? null)
-##         (print "null is null"))
-##     (else
-##         (print "weeird")) )
-## 
-## (jello = true)
-## (print "test jello")
-## (while jello
-##     (print "good jello")
-##     (jello = false))
-## (print "no jello")
-## 
-## # TODO: implement cond
-## #
-## #(i = 0)
-## #(i = (+ i 1))
-## #

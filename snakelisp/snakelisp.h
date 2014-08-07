@@ -17,9 +17,9 @@
 #define ARG_BOOLEAN(index) \
     ({ value_t a = ARG(index); if(!isBoolean(a)) ARG_ERROR(index, "boolean"); unboxBoolean(a);})
 #define ARG_INTEGER(index) \
-    ({ value_t a = ARG(index); if(!isInteger(a) && !isBoolean(a)) ARG_ERROR(index, "integer"); unboxInteger(a);})
+    ({ value_t a = ARG(index); if(!coercesToInteger(a)) ARG_ERROR(index, "integer"); unboxInteger(a);})
 #define ARG_DOUBLE(index) \
-    ({ value_t a = ARG(index); if(!isDouble(a) && !isInteger(a) && !isBoolean(a)) ARG_ERROR(index, "double"); unboxDouble(a);})
+    ({ value_t a = ARG(index); if(!coercesToDouble(a) && !isBoolean(a)) ARG_ERROR(index, "double"); unboxDouble(a);})
 #define ARG_STRING(index) \
     ({ value_t a = ARG(index); if(!isString(a)) ARG_ERROR(index, "string"); unboxString(a);})
 #define ARG_ARRAYBUFFER(index) \
@@ -220,6 +220,16 @@ static inline long isClosure(value_t value)
 static inline long isString(value_t value)
 {
     return value.type == TYPE_STRING;
+}
+
+static inline long coercesToInteger(value_t value)
+{
+    return value.type == TYPE_INTEGER || value.type == TYPE_BOOLEAN;
+}
+
+static inline long coercesToDouble(value_t value)
+{
+    return value.type == TYPE_DOUBLE || value.type == TYPE_INTEGER || value.type == TYPE_BOOLEAN;
 }
 
 static inline array_t *initArray(array_t *array, size_t length)

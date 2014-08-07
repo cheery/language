@@ -59,8 +59,9 @@ static CONTINUATION(file_read)
     arraybuffer_t *buffer = ARG_ARRAYBUFFER(3);
     size_t count = buffer->length;
     if (argc > 4) count = ARG_INTEGER(4);
-
-    call(ARG(1), boxInteger(read(fd, buffer->data, count)));
+    count = read(fd, buffer->data, count);
+    printf("\n\n*** read %i bytes\n\n", count);
+    call(ARG(1), boxInteger(count));
 }
 
 static CONTINUATION(file_write)
@@ -85,6 +86,7 @@ static CONTINUATION(file_write)
         ARG_ERROR(3, "arraybuffer or string");
     }
     if (argc > 4) count = ARG_INTEGER(4);
+    printf("*** writing %i bytes\n\n", count);
     call(ARG(1), boxInteger(write(fd, data, count)));
 }
 
@@ -246,27 +248,24 @@ static CONTINUATION(is_string)
     value_t a = ARG(2); \
     value_t b = ARG(3); \
  \
-    switch (a.type) \
+    if (coercesToInteger(a) && coercesToInteger(b)) \
     { \
-        case TYPE_INTEGER: \
-            if (isInteger(b) || isBoolean(b)) \
-            { \
-                truth = (ARG_INTEGER(2) op ARG_INTEGER(3)); \
-            } \
-            break; \
-        case TYPE_DOUBLE: \
-            if (isInteger(b) || isBoolean(b) || isDouble(b)) \
-            { \
-                truth = (ARG_DOUBLE(2) op ARG_DOUBLE(3)); \
-            } \
-            break; \
-        case TYPE_STRING: \
-            ARG_ERROR(2, "not implemented") \
-            break; \
-        default: \
-            truth = (a.type == b.type) && (a.a.address op b.a.address); \
+        truth = ARG_INTEGER(2) op ARG_INTEGER(3); \
     } \
- \
+    else if (coercesToDouble(a) && coercesToDouble(b)) \
+    { \
+        truth = ARG_INTEGER(2) op ARG_INTEGER(3); \
+    } \
+    else if (isString(a) && isString(b)) \
+    { \
+        string_t *astr = ARG_STRING(2); \
+        string_t *bstr = ARG_STRING(3); \
+        truth = (strcmp(astr->data, bstr->data) op 0); \
+    } \
+    else \
+    { \
+        assert(false); /* not implemented for this value pair. */ \
+    } \
     call(ARG(1), boxBoolean(truth)); \
 }
 
