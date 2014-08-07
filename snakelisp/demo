@@ -13,14 +13,13 @@
 # #            (rw)))))
 # #(rw)
 # 
-# produces error
-(while (lt 0 (count = (file-read fd buffer)))
-    (file-write stdout buffer count))
+# works now
+#(while (lt 0 (count = (file-read fd buffer)))
+#    (file-write stdout buffer count))
 # 
 ## works now
-#(count = (file-read fd buffer))
-#(while (lt 0 count)
-#    (file-write stdout buffer count)
-#    (count = (file-read fd buffer)))
-# 
+(count = (file-read fd buffer))
+(while (lt 0 count)
+    (file-write stdout buffer count)
+    (count = (file-read fd buffer)))
 (file-close fd)

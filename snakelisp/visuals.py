@@ -17,6 +17,11 @@ def populate(graph, expr):
         return graph.cache[expr]
     if expr.type == 'lambda':
         lamb = get_uid(graph, expr, len(expr)+1)
+        for var, val in expr.motion:
+            uid = populate(graph, var)
+            uid2 = populate(graph, val)
+            new_edge(graph, lamb, len(expr), uid2)
+            new_edge(graph, uid2, 0, uid)
         for i, var in enumerate(expr):
             uid = populate(graph, var)
             new_edge(graph, lamb, i, uid)

@@ -19,6 +19,7 @@ class Lambda(object):
         self.arguments = arguments
         self.body      = body
         self.motion    = []
+        self.notdefn   = set()
 
     def __getitem__(self, index):
         return self.arguments[index]
@@ -30,6 +31,8 @@ class Lambda(object):
         while self.body.type == 'assign':
             a = self.body.coalesce()
             self.motion.append((a.variable, a.value))
+            if not self.body.defn:
+                self.notdefn.add(a.variable)
             self.body = a.body
         self.body = self.body.coalesce()
         if self.body.type == 'call' and self.body.arguments[1:] == self.arguments:
@@ -38,10 +41,11 @@ class Lambda(object):
 
 class Assign(object):
     type = 'assign'
-    def __init__(self, variable, value, body):
+    def __init__(self, variable, value, body, defn=False):
         self.variable = variable
         self.value    = value
         self.body     = body
+        self.defn     = defn
 
     def coalesce(self):
         self.variable = self.variable.coalesce()

@@ -4,7 +4,7 @@ def transpile(lamb, extra_headers=(), sourcename="<noname>"):
     ctx  = Context()
     lambdas = collect_lambdas(set(), lamb)
     scopevars = {}
-    collect_scopevars(scopevars, lamb, set())
+    collect_scopevars(scopevars, lamb)
     lines = [
         '/* generated from: {} */'.format(sourcename),
         '#include "snakelisp.h"',
@@ -96,15 +96,14 @@ def collect_lambdas(lambdas, obj):
             collect_lambdas(lambdas, expr)
     return lambdas
 
-def collect_scopevars(scopevars, obj, defn):
+def collect_scopevars(scopevars, obj):
     if obj.type == 'lambda':
-        defns = set(obj)
-        defns.update(var for var, val in obj.motion)
-        print defns
-        inscope = collect_scopevars(scopevars, obj.body, defn | defns)
+        inscope = collect_scopevars(scopevars, obj.body)
         for var, val in reversed(obj.motion):
-            inscope |= collect_scopevars(scopevars, val, defn | defns)
-            if var not in defn:
+            inscope |= collect_scopevars(scopevars, val)
+            if var in obj.notdefn:
+                inscope.add(var)
+            else:
                 inscope.discard(var)
         for var in obj:
             inscope.discard(var)
@@ -113,7 +112,7 @@ def collect_scopevars(scopevars, obj, defn):
     elif obj.type == 'call':
         inscope = set()
         for expr in obj:
-            inscope |= collect_scopevars(scopevars, expr, defn)
+            inscope |= collect_scopevars(scopevars, expr)
         return inscope
     elif obj.type == 'variable' and not obj.glob:
         return {obj}

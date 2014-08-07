@@ -57,6 +57,10 @@ def main():
     cdefns = ["extern value_t {};".format(value[1:]) for name, value in c_api.items()]
     for var in env.seal():
         var.c_handle = c_api[var.name]
+
+    #import visuals
+    #visuals.create_graph("demo.png", program)
+
     source = transpiler.transpile(program, cdefns, path)
     open(path+'.c', 'w').write(source)
     subprocess.call(["gcc", path+'.c', "snakelisp.c"])
@@ -153,7 +157,8 @@ def build_while(mks, exprs, env):
     mks.append(lambda cont: Assign(
         self,
         Lambda([lcont], compose(lmks, Call([env.new_implicit('pick'), lcont, cc, self, exit]))),
-        Call([env.new_implicit('pick'), Lambda([retval], cont), cn, self, exit])))
+        Call([env.new_implicit('pick'), Lambda([retval], cont), cn, self, exit]),
+        defn=True))
     return retval
 
 def nullfunc():
