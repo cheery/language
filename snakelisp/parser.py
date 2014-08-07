@@ -14,6 +14,7 @@ SINGLEQUOTE = 5
 DOUBLEQUOTE = 6
 SYMBOL  = 7
 ESCAPE  = 8
+DOTS    = 9
 
 def parse(source, index=0):
     stack   = []
@@ -51,6 +52,9 @@ def tokenize(source, index=0):
         if state == SYMBOL:
             if issym(ch):
                 string += ch
+            elif string + ch == '..':
+                string += ch
+                state = DOTS
             elif string.startswith('.'):
                 yield Annotation(start, index, 'attribute', string)
                 state = IDLE
@@ -77,6 +81,12 @@ def tokenize(source, index=0):
                 string += ch
             else:
                 yield Annotation(start, index, 'double', float(string))
+                state = IDLE
+        elif state == DOTS:
+            if ch == '.':
+                string += ch
+            else:
+                yield Annotation(start, index, 'dots', string)
                 state = IDLE
 
         if state == IDLE:

@@ -239,6 +239,44 @@ static CONTINUATION(is_string)
 {
     call(ARG(1), boxBoolean(isString(ARG(2))));
 }
+
+#define COMPARATOR(op) \
+{ \
+    long truth = false; \
+    value_t a = ARG(2); \
+    value_t b = ARG(3); \
+ \
+    switch (a.type) \
+    { \
+        case TYPE_INTEGER: \
+            if (isInteger(b) || isBoolean(b)) \
+            { \
+                truth = (ARG_INTEGER(2) op ARG_INTEGER(3)); \
+            } \
+            break; \
+        case TYPE_DOUBLE: \
+            if (isInteger(b) || isBoolean(b) || isDouble(b)) \
+            { \
+                truth = (ARG_DOUBLE(2) op ARG_DOUBLE(3)); \
+            } \
+            break; \
+        case TYPE_STRING: \
+            ARG_ERROR(2, "not implemented") \
+            break; \
+        default: \
+            truth = (a.type == b.type) && (a.a.address op b.a.address); \
+    } \
+ \
+    call(ARG(1), boxBoolean(truth)); \
+}
+
+static CONTINUATION(op_eq) COMPARATOR(==)
+static CONTINUATION(op_lt) COMPARATOR(<)
+static CONTINUATION(op_le) COMPARATOR(<=)
+static CONTINUATION(op_gt) COMPARATOR(>)
+static CONTINUATION(op_ge) COMPARATOR(>=)
+static CONTINUATION(op_ne) COMPARATOR(!=)
+
 //
 //CONTINUATION(c_eq)
 //{
@@ -322,7 +360,10 @@ value_t
     v_is_double,
     v_is_array,
     v_is_arraybuffer,
-    v_is_string;
+    v_is_string,
+    v_eq, v_ne,
+    v_lt, v_le,
+    v_gt, v_ge;
 
 static CONTINUATION(quit)
 {
@@ -360,6 +401,13 @@ void snakeBoot(value_t entry)
     v_is_array = spawnClosure(is_array);
     v_is_arraybuffer = spawnClosure(is_arraybuffer);
     v_is_string = spawnClosure(is_string);
+
+    v_eq = spawnClosure(op_eq);
+    v_ne = spawnClosure(op_ne);
+    v_lt = spawnClosure(op_lt);
+    v_le = spawnClosure(op_le);
+    v_gt = spawnClosure(op_gt);
+    v_ge = spawnClosure(op_ge);
 
     call(entry, spawnClosure(quit));
 }

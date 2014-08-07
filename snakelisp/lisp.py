@@ -2,6 +2,7 @@ import parser
 import transpiler
 from cps import Call, Lambda, Assign, Variable, Constant, Environ, null, true, false
 import subprocess
+import sys
 
 # call = Call([arguments]), call[i]
 # lambda = Lambda([arguments], body), lambda[i]
@@ -10,11 +11,12 @@ import subprocess
 # Constant(value)
 
 def main():
+    path = sys.argv[1]
     mks = []
     env = Environ()
     ret = env.new_argument("cont", False)
     var = null
-    for expr in open_list('demo'):
+    for expr in open_list(path):
         var = continuate(mks, expr, env)
     program = env.close(compose(mks, Call([ret, var])))
     program = program.coalesce()
@@ -45,13 +47,19 @@ def main():
         "array?":      "&v_is_array",
         "arraybuffer?":"&v_is_arraybuffer",
         "string?":     "&v_is_string",
+        "lt":          "&v_lt",
+        "gt":          "&v_gt",
+        "le":          "&v_le",
+        "ge":          "&v_ge",
+        "eq":          "&v_eq",
+        "ne":          "&v_ne",
     }
     cdefns = ["extern value_t {};".format(value[1:]) for name, value in c_api.items()]
     for var in env.seal():
         var.c_handle = c_api[var.name]
-    source = transpiler.transpile(program, cdefns, "demo")
-    open('demo.c', 'w').write(source)
-    subprocess.call(["gcc", "demo.c", "snakelisp.c"])
+    source = transpiler.transpile(program, cdefns, path)
+    open(path+'.c', 'w').write(source)
+    subprocess.call(["gcc", path+'.c', "snakelisp.c"])
 
 
 constants = {'null': null, 'true':true, 'false':false}

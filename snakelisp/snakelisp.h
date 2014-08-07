@@ -1,5 +1,6 @@
 #include <alloca.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,9 +17,9 @@
 #define ARG_BOOLEAN(index) \
     ({ value_t a = ARG(index); if(!isBoolean(a)) ARG_ERROR(index, "boolean"); unboxBoolean(a);})
 #define ARG_INTEGER(index) \
-    ({ value_t a = ARG(index); if(!isInteger(a)) ARG_ERROR(index, "integer"); unboxInteger(a);})
+    ({ value_t a = ARG(index); if(!isInteger(a) && !isBoolean(a)) ARG_ERROR(index, "integer"); unboxInteger(a);})
 #define ARG_DOUBLE(index) \
-    ({ value_t a = ARG(index); if(!isDouble(a) && !isInteger(a)) ARG_ERROR(index, "double"); unboxDouble(a);})
+    ({ value_t a = ARG(index); if(!isDouble(a) && !isInteger(a) && !isBoolean(a)) ARG_ERROR(index, "double"); unboxDouble(a);})
 #define ARG_STRING(index) \
     ({ value_t a = ARG(index); if(!isString(a)) ARG_ERROR(index, "string"); unboxString(a);})
 #define ARG_ARRAYBUFFER(index) \
@@ -111,14 +112,14 @@ static inline value_t boxNull()
 static inline value_t boxTrue()
 {
     value_t value   = {TYPE_BOOLEAN};
-    value.a.integer = (1==1);
+    value.a.integer = true;
     return value;
 }
 
 static inline value_t boxFalse()
 {
     value_t value   = {TYPE_BOOLEAN};
-    value.a.integer = (1==2);
+    value.a.integer = false;
     return value;
 }
 
@@ -269,11 +270,13 @@ static inline long unboxBoolean(value_t value)
 
 static inline long unboxInteger(value_t value)
 {
+    if (isBoolean(value)) return (double)(value.a.integer?1:0); // implicit coercion
     return value.a.integer;
 }
 
 static inline double unboxDouble(value_t value)
 {
+    if (isBoolean(value)) return (double)(value.a.integer?1:0); // implicit coercion
     if (isInteger(value)) return (double)value.a.integer; // implicit coercion
     return value.a.real;
 }
