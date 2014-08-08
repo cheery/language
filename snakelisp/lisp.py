@@ -53,6 +53,17 @@ def main():
         "ge":          "&v_ge",
         "eq":          "&v_eq",
         "ne":          "&v_ne",
+        "+":           "&v_add",
+        "-":           "&v_sub",
+        "*":           "&v_mul",
+        "/":           "&v_div",
+        "//":          "&v_floordiv",
+        "%":           "&v_modulus",
+        "chr":         "&v_to_character",
+        "ord":         "&v_to_ordinal",
+        "and":         "&v_and",
+        "or":          "&v_or",
+        "not":         "&v_not",
     }
     cdefns = ["extern value_t {};".format(value[1:]) for name, value in c_api.items()]
     for var in env.seal():

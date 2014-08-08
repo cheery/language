@@ -18,14 +18,13 @@ static CONTINUATION(call_cc)
 
 static CONTINUATION(pick)
 {
-    value_t cond = ARG(2);
-    if (isFalse(cond) || isNull(cond))
+    if (unboxBoolean(ARG(2)))
     {
-        call(ARG(4), ARG(1));
+        call(ARG(3), ARG(1));
     }
     else
     {
-        call(ARG(3), ARG(1));
+        call(ARG(4), ARG(1));
     }
 }
 
@@ -60,7 +59,6 @@ static CONTINUATION(file_read)
     size_t count = buffer->length;
     if (argc > 4) count = ARG_INTEGER(4);
     count = read(fd, buffer->data, count);
-    printf("\n\n*** read %i bytes\n\n", count);
     call(ARG(1), boxInteger(count));
 }
 
@@ -86,7 +84,6 @@ static CONTINUATION(file_write)
         ARG_ERROR(3, "arraybuffer or string");
     }
     if (argc > 4) count = ARG_INTEGER(4);
-    printf("*** writing %i bytes\n\n", count);
     call(ARG(1), boxInteger(write(fd, data, count)));
 }
 
@@ -254,7 +251,7 @@ static CONTINUATION(is_string)
     } \
     else if (coercesToDouble(a) && coercesToDouble(b)) \
     { \
-        truth = ARG_INTEGER(2) op ARG_INTEGER(3); \
+        truth = ARG_DOUBLE(2) op ARG_DOUBLE(3); \
     } \
     else if (isString(a) && isString(b)) \
     { \
@@ -276,28 +273,156 @@ static CONTINUATION(op_gt) COMPARATOR(>)
 static CONTINUATION(op_ge) COMPARATOR(>=)
 static CONTINUATION(op_ne) COMPARATOR(!=)
 
-//
-//CONTINUATION(c_eq)
-//{
-//    ARG(cont, 1);
-//    ARG(lhs,  2);
-//    ARG(rhs,  3);
-//    c_call_begin(2);
-//    c_call_argument(0, cont);
-//    c_call_argument(1, c_const_boolean(lhs.type==rhs.type && lhs.data.integer == rhs.data.integer));
-//    c_call_end();
-//}
-//
-//CONTINUATION(c_ne)
-//{
-//    ARG(cont, 1);
-//    ARG(lhs,  2);
-//    ARG(rhs,  3);
-//    c_call_begin(2);
-//    c_call_argument(0, cont);
-//    c_call_argument(1, c_const_boolean(lhs.type!=rhs.type || lhs.data.integer != rhs.data.integer));
-//    c_call_end();
-//}
+
+
+static CONTINUATION(op_add)
+{
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        call(ARG(1), boxInteger(ARG_INTEGER(2) + ARG_INTEGER(3)));
+    }
+    else if (coercesToDouble(a) && coercesToDouble(b))
+    {
+        call(ARG(1), boxDouble(ARG_DOUBLE(2) + ARG_DOUBLE(3)));
+    }
+    else
+    {
+        ARG_ERROR(2, "integer or double");
+    }
+}
+
+static CONTINUATION(op_sub)
+{
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        call(ARG(1), boxInteger(ARG_INTEGER(2) - ARG_INTEGER(3)));
+    }
+    else if (coercesToDouble(a) && coercesToDouble(b))
+    {
+        call(ARG(1), boxDouble(ARG_DOUBLE(2) - ARG_DOUBLE(3)));
+    }
+    else
+    {
+        ARG_ERROR(2, "integer or double");
+    }
+}
+
+static CONTINUATION(op_mul)
+{
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        call(ARG(1), boxInteger(ARG_INTEGER(2) * ARG_INTEGER(3)));
+    }
+    else if (coercesToDouble(a) && coercesToDouble(b))
+    {
+        call(ARG(1), boxDouble(ARG_DOUBLE(2) * ARG_DOUBLE(3)));
+    }
+    else
+    {
+        ARG_ERROR(2, "integer or double");
+    }
+}
+
+static CONTINUATION(op_div)
+{
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        call(ARG(1), boxInteger(ARG_INTEGER(2) / ARG_INTEGER(3)));
+    }
+    else if (coercesToDouble(a) && coercesToDouble(b))
+    {
+        call(ARG(1), boxDouble(ARG_DOUBLE(2) / ARG_DOUBLE(3)));
+    }
+    else
+    {
+        ARG_ERROR(2, "integer or double");
+    }
+}
+
+static CONTINUATION(op_floordiv)
+{
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        call(ARG(1), boxInteger(ARG_INTEGER(2) / ARG_INTEGER(3)));
+    }
+    else if (coercesToDouble(a) && coercesToDouble(b))
+    {
+        call(ARG(1), boxInteger(ARG_DOUBLE(2) / ARG_DOUBLE(3)));
+    }
+    else
+    {
+        ARG_ERROR(2, "integer or double");
+    }
+}
+
+static CONTINUATION(op_modulus)
+{
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        call(ARG(1), boxInteger(ARG_INTEGER(2) % ARG_INTEGER(3)));
+    }
+//  need to figure out nice way to this later on.
+//    else if (coercesToDouble(a) && coercesToDouble(b))
+//    {
+//        call(ARG(1), boxInteger(ARG_DOUBLE(2) % ARG_DOUBLE(3)));
+//    }
+    else
+    {
+        ARG_ERROR(2, "integer");
+    }
+}
+
+static CONTINUATION(to_character)
+{
+    char ch = ARG_INTEGER(2);
+    call(ARG(1), boxString(newString(1, &ch)));
+}
+
+static CONTINUATION(to_ordinal)
+{
+    string_t *a = ARG_STRING(2);
+    if (a->length == 0)
+    {
+        call(ARG(1), boxNull());
+    }
+    else
+    {
+        call(ARG(1), boxInteger(a->data[0]));
+    }
+}
+
+static CONTINUATION(op_and)
+{
+    size_t i;
+    long truth = true;
+    for (i = 2; i < argc; i++) truth = truth && ARG_BOOLEAN(i);
+    call(ARG(1), boxBoolean(truth));
+}
+
+static CONTINUATION(op_or)
+{
+    size_t i = 2;
+    long truth = false;
+    for (i = 2; i < argc; i++) truth = truth || ARG_BOOLEAN(i);
+    call(ARG(1), boxBoolean(truth));
+}
+
+static CONTINUATION(op_not)
+{
+    call(ARG(1), boxBoolean(!ARG_BOOLEAN(2)));
+}
 //
 //
 //void c_boot(code_t entry)
@@ -362,7 +487,18 @@ value_t
     v_is_string,
     v_eq, v_ne,
     v_lt, v_le,
-    v_gt, v_ge;
+    v_gt, v_ge,
+    v_add,
+    v_sub,
+    v_mul,
+    v_div,
+    v_floordiv,
+    v_modulus,
+    v_to_character,
+    v_to_ordinal,
+    v_and,
+    v_or,
+    v_not;
 
 static CONTINUATION(quit)
 {
@@ -407,6 +543,18 @@ void snakeBoot(value_t entry)
     v_le = spawnClosure(op_le);
     v_gt = spawnClosure(op_gt);
     v_ge = spawnClosure(op_ge);
+
+    v_add = spawnClosure(op_add);
+    v_sub = spawnClosure(op_sub);
+    v_mul = spawnClosure(op_mul);
+    v_div = spawnClosure(op_div);
+    v_floordiv = spawnClosure(op_floordiv);
+    v_modulus  = spawnClosure(op_modulus);
+    v_to_character = spawnClosure(to_character);
+    v_to_ordinal   = spawnClosure(to_ordinal);
+    v_and = spawnClosure(op_and);
+    v_or  = spawnClosure(op_or);
+    v_not = spawnClosure(op_not);
 
     call(entry, spawnClosure(quit));
 }

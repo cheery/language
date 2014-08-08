@@ -15,7 +15,7 @@
 #define ARG_CLOSURE(index) \
     ({ value_t a = ARG(index); if(!isClosure(a)) ARG_ERROR(index, "closure"); unboxClosure(a);})
 #define ARG_BOOLEAN(index) \
-    ({ value_t a = ARG(index); if(!isBoolean(a)) ARG_ERROR(index, "boolean"); unboxBoolean(a);})
+    ({ value_t a = ARG(index); unboxBoolean(a);})
 #define ARG_INTEGER(index) \
     ({ value_t a = ARG(index); if(!coercesToInteger(a)) ARG_ERROR(index, "integer"); unboxInteger(a);})
 #define ARG_DOUBLE(index) \
@@ -275,7 +275,7 @@ static inline string_t *initString(string_t *string, size_t length, const char *
  */
 static inline long unboxBoolean(value_t value)
 {
-    return value.a.integer;
+    return !(isFalse(value) || isNull(value));
 }
 
 static inline long unboxInteger(value_t value)

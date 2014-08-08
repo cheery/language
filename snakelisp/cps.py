@@ -30,9 +30,10 @@ class Lambda(object):
     def coalesce(self):
         while self.body.type == 'assign':
             a = self.body.coalesce()
-            self.motion.append((a.variable, a.value))
+            mot = (a.variable, a.value)
+            self.motion.append(mot)
             if not self.body.defn:
-                self.notdefn.add(a.variable)
+                self.notdefn.add(mot)
             self.body = a.body
         self.body = self.body.coalesce()
         if self.body.type == 'call' and self.body.arguments[1:] == self.arguments:

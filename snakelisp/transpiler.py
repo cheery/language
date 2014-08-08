@@ -99,9 +99,10 @@ def collect_lambdas(lambdas, obj):
 def collect_scopevars(scopevars, obj):
     if obj.type == 'lambda':
         inscope = collect_scopevars(scopevars, obj.body)
-        for var, val in reversed(obj.motion):
+        for mot in reversed(obj.motion):
+            var, val = mot
             inscope |= collect_scopevars(scopevars, val)
-            if var in obj.notdefn:
+            if mot in obj.notdefn:
                 inscope.add(var)
             else:
                 inscope.discard(var)

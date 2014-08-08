@@ -1,8 +1,9 @@
 # #(print = (func (line)
 # #    (file-write stdout (cat line "\n"))))
-# 
+
 (fd = (file-open "demo"))
 (buffer = (arraybuffer 262))
+
 # 
 # # works
 # #(rw = (func ()
