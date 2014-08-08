@@ -8,7 +8,8 @@ if exists("b:current_syntax")
 endif
 
 syn match  snakeComment "#.*$"
-syn region snakeString start=+"+ skip=+\\"+ end=+"+
+syn region snakeString start=/\v"/ skip=/\v\\./ end=/\v"/
+syn region snakeString start=/\v'/ skip=/\v\\./ end=/\v'/
 syn match  snakeSymbol "[a-zA-Z_][a-zA-Z_0-9\-]*"
 syn match  snakeDelimiter "("
 syn match  snakeDelimiter ")"
