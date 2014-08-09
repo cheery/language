@@ -462,6 +462,11 @@ static CONTINUATION(op_log)
     call(ARG(1), boxDouble(log(ARG_DOUBLE(2))));
 }
 
+static CONTINUATION(op_exp)
+{
+    call(ARG(1), boxDouble(exp(ARG_DOUBLE(2))));
+}
+
 static CONTINUATION(op_pow)
 {
     call(ARG(1), boxDouble(pow(ARG_DOUBLE(2), ARG_DOUBLE(3))));
@@ -519,6 +524,7 @@ value_t
     v_bit_xor,
     v_bit_not,
     v_log,
+    v_exp,
     v_pow,
     v_sqrt;
 
@@ -585,6 +591,7 @@ void snakeBoot(value_t entry)
     v_bit_xor = spawnClosure(op_bit_xor);
     v_bit_not = spawnClosure(op_bit_not);
     v_log = spawnClosure(op_log);
+    v_exp = spawnClosure(op_exp);
     v_pow = spawnClosure(op_pow);
     v_sqrt = spawnClosure(op_sqrt);
 

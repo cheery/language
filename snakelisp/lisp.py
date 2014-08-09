@@ -71,6 +71,7 @@ def main():
         "^":           "&v_bit_xor",
         "~":           "&v_bit_not",
         "log":         "&v_log",
+        "exp":         "&v_exp",
         "pow":         "&v_pow",
         "sqrt":        "&v_sqrt",
     }
