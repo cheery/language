@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <math.h>
 
 static CONTINUATION(call_cc_continue)
 {
@@ -127,8 +128,11 @@ static CONTINUATION(length_of)
         case TYPE_ARRAYBUFFER:
             length = ARG_ARRAYBUFFER(2)->length;
             break;
+        case TYPE_ARRAY:
+            length = ARG_ARRAY(2)->length;
+            break;
         default:
-            ARG_ERROR(2, "arraybuffer or string");
+            ARG_ERROR(2, "array, arraybuffer or string");
     }
     call(ARG(1), boxInteger(length));
 }
@@ -423,42 +427,51 @@ static CONTINUATION(op_not)
 {
     call(ARG(1), boxBoolean(!ARG_BOOLEAN(2)));
 }
-//
-//
-//void c_boot(code_t entry)
-//{
-//    closure_t closure = {entry,  0};
-//    closure_t cont    = {c_quit, 0}; 
-//
-//    closure_t pick        = {c_pick, 0};
-//    closure_t arraybuffer = {c_arraybuffer, 0};
-//    closure_t file_open   = {c_file_open, 0};
-//    closure_t file_close  = {c_file_close, 0};
-//    closure_t file_read   = {c_file_read, 0};
-//    closure_t file_write  = {c_file_write, 0};
-//    closure_t length      = {c_length, 0};
-//    closure_t idx         = {c_idx, 0};
-//    closure_t set_idx     = {c_set_idx, 0};
-//
-//    cl_pick         = c_const_closure(&pick);
-//    cl_arraybuffer  = c_const_closure(&arraybuffer);
-//    cl_file_open    = c_const_closure(&file_open);
-//    cl_file_close   = c_const_closure(&file_close);
-//    cl_file_read    = c_const_closure(&file_read);
-//    cl_file_write   = c_const_closure(&file_write);
-//    cl_length       = c_const_closure(&length);
-//    cl_idx          = c_const_closure(&idx);
-//    cl_set_idx      = c_const_closure(&set_idx);
-//    v_stdin  = c_const_integer(0);
-//    v_stdout = c_const_integer(1);
-//    v_stderr = c_const_integer(2);
-//
-//    printf("achievement: bootup\n");
-//    c_call_begin(2);
-//    c_call_argument(0, c_const_closure(&closure));
-//    c_call_argument(1, c_const_closure(&cont));
-//    c_call_end();
-//}
+
+static CONTINUATION(op_lsh)
+{
+    call(ARG(1), boxInteger(ARG_INTEGER(2) << ARG_INTEGER(3)));
+}
+
+static CONTINUATION(op_rsh)
+{
+    call(ARG(1), boxInteger(ARG_INTEGER(2) >> ARG_INTEGER(3)));
+}
+
+static CONTINUATION(op_bit_or)
+{
+    call(ARG(1), boxInteger(ARG_INTEGER(2) | ARG_INTEGER(3)));
+}
+static CONTINUATION(op_bit_and)
+{
+    call(ARG(1), boxInteger(ARG_INTEGER(2) & ARG_INTEGER(3)));
+}
+
+static CONTINUATION(op_bit_xor)
+{
+    call(ARG(1), boxInteger(ARG_INTEGER(2) ^ ARG_INTEGER(3)));
+}
+
+static CONTINUATION(op_bit_not)
+{
+    call(ARG(1), boxInteger(~ARG_INTEGER(2)));
+}
+
+static CONTINUATION(op_log)
+{
+    call(ARG(1), boxDouble(log(ARG_DOUBLE(2))));
+}
+
+static CONTINUATION(op_pow)
+{
+    call(ARG(1), boxDouble(pow(ARG_DOUBLE(2), ARG_DOUBLE(3))));
+}
+
+static CONTINUATION(op_sqrt)
+{
+    call(ARG(1), boxDouble(sqrt(ARG_DOUBLE(2))));
+}
+
 value_t
     v_call_cc,
     v_pick,
@@ -498,7 +511,16 @@ value_t
     v_to_ordinal,
     v_and,
     v_or,
-    v_not;
+    v_not,
+    v_lsh,
+    v_rsh,
+    v_bit_or,
+    v_bit_and,
+    v_bit_xor,
+    v_bit_not,
+    v_log,
+    v_pow,
+    v_sqrt;
 
 static CONTINUATION(quit)
 {
@@ -555,6 +577,16 @@ void snakeBoot(value_t entry)
     v_and = spawnClosure(op_and);
     v_or  = spawnClosure(op_or);
     v_not = spawnClosure(op_not);
+
+    v_lsh = spawnClosure(op_lsh);
+    v_rsh = spawnClosure(op_rsh);
+    v_bit_or = spawnClosure(op_bit_or);
+    v_bit_and = spawnClosure(op_bit_and);
+    v_bit_xor = spawnClosure(op_bit_xor);
+    v_bit_not = spawnClosure(op_bit_not);
+    v_log = spawnClosure(op_log);
+    v_pow = spawnClosure(op_pow);
+    v_sqrt = spawnClosure(op_sqrt);
 
     call(entry, spawnClosure(quit));
 }

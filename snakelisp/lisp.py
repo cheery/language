@@ -64,6 +64,15 @@ def main():
         "and":         "&v_and",
         "or":          "&v_or",
         "not":         "&v_not",
+        "<<":          "&v_lsh",
+        ">>":          "&v_rsh",
+        "|":           "&v_bit_or",
+        "&":           "&v_bit_and",
+        "^":           "&v_bit_xor",
+        "~":           "&v_bit_not",
+        "log":         "&v_log",
+        "pow":         "&v_pow",
+        "sqrt":        "&v_sqrt",
     }
     cdefns = ["extern value_t {};".format(value[1:]) for name, value in c_api.items()]
     for var in env.seal():
@@ -74,7 +83,7 @@ def main():
 
     source = transpiler.transpile(program, cdefns, path)
     open(path+'.c', 'w').write(source)
-    subprocess.call(["gcc", path+'.c', "snakelisp.c"])
+    subprocess.call(["gcc", path+'.c', "snakelisp.c", "-lm"])
 
 
 constants = {'null': null, 'true':true, 'false':false}
