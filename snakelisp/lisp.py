@@ -75,10 +75,13 @@ def main():
         "exp":         "&v_exp",
         "pow":         "&v_pow",
         "sqrt":        "&v_sqrt",
+        "uncallable-hook": "&uncallable_hook",
     }
-    cdefns = ["extern value_t {};".format(value[1:]) for name, value in c_api.items()]
+    c_use = set()
     for var in env.seal():
         var.c_handle = c_api[var.name]
+        c_use.add(var.c_handle)
+    cdefns = ["extern value_t {};".format(value[1:]) for value in c_use]
 
     #import visuals
     #visuals.create_graph("demo.png", program)

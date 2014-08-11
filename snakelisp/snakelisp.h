@@ -11,7 +11,7 @@
 #define SLOT(index) (closureSlot(frame, index))
 
 #define ARG_ERROR(index, expected) \
-    assert(-1 == index);
+    assert(false);
 #define ARG_CLOSURE(index) \
     ({ value_t a = ARG(index); if(!isClosure(a)) ARG_ERROR(index, "closure"); unboxClosure(a);})
 #define ARG_BOOLEAN(index) \
@@ -340,6 +340,9 @@ static inline string_t* unboxString(value_t value)
  */
 #include <assert.h>
 
+extern value_t uncallable_hook;
+extern value_t error_quit;
+
 /*
  * invariant: we have at least a callee.
  */
@@ -352,7 +355,14 @@ static inline void snakeCall(size_t argc, value_t *argv)
     }
     else
     {
-        ARG_ERROR(0, "closure");
+        if (isClosure(uncallable_hook))
+        {
+            call(uncallable_hook, error_quit, argv[0]);
+        }
+        else
+        {
+            assert(false);
+        }
     }
 }
 

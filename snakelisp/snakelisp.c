@@ -581,14 +581,25 @@ value_t
     v_pow,
     v_sqrt;
 
+value_t uncallable_hook;
+value_t error_quit;
+
 static CONTINUATION(quit)
 {
     printf("achievement: exit through the door\n");
     exit(0);
 }
 
+static CONTINUATION(errorQuit)
+{
+    printf("achievement: exit through the floor\n");
+    exit(1);
+}
+
 void snakeBoot(value_t entry)
 {
+    uncallable_hook = boxNull();
+
     v_call_cc = spawnClosure(call_cc);
     v_pick = spawnClosure(pick);
     v_array       = spawnClosure(new_array);
@@ -648,5 +659,6 @@ void snakeBoot(value_t entry)
     v_pow = spawnClosure(op_pow);
     v_sqrt = spawnClosure(op_sqrt);
 
+    error_quit = spawnClosure(errorQuit);
     call(entry, spawnClosure(quit));
 }

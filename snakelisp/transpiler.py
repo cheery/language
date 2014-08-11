@@ -110,6 +110,8 @@ def collect_scopevars(scopevars, obj):
         for mot in reversed(obj.motion):
             var, val = mot
             inscope |= collect_scopevars(scopevars, val)
+            if var.glob:
+                continue
             if mot in obj.notdefn:
                 inscope.add(var)
             else:
