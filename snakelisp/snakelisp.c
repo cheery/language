@@ -270,12 +270,65 @@ static CONTINUATION(is_string)
     call(ARG(1), boxBoolean(truth)); \
 }
 
-static CONTINUATION(op_eq) COMPARATOR(==)
 static CONTINUATION(op_lt) COMPARATOR(<)
 static CONTINUATION(op_le) COMPARATOR(<=)
 static CONTINUATION(op_gt) COMPARATOR(>)
 static CONTINUATION(op_ge) COMPARATOR(>=)
-static CONTINUATION(op_ne) COMPARATOR(!=)
+
+static CONTINUATION(op_eq)
+{
+    long truth = false;
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        truth = ARG_INTEGER(2) == ARG_INTEGER(3);
+    }
+    else if (coercesToDouble(a) && coercesToDouble(b))
+    {
+        truth = ARG_DOUBLE(2) == ARG_DOUBLE(3);
+    }
+    else if (isString(a) && isString(b))
+    {
+        string_t *astr = ARG_STRING(2);
+        string_t *bstr = ARG_STRING(3);
+        truth = (strcmp(astr->data, bstr->data) == 0);
+    }
+    else
+    {
+        truth = (a.type == b.type) && (a.a.address == b.a.address);
+    }
+    call(ARG(1), boxBoolean(truth));
+}
+
+static CONTINUATION(op_ne)
+{
+    long truth = false;
+    value_t a = ARG(2);
+    value_t b = ARG(3);
+
+    if (coercesToInteger(a) && coercesToInteger(b))
+    {
+        truth = ARG_INTEGER(2) != ARG_INTEGER(3);
+    }
+    else if (coercesToDouble(a) && coercesToDouble(b))
+    {
+        truth = ARG_DOUBLE(2) != ARG_DOUBLE(3);
+    }
+    else if (isString(a) && isString(b))
+    {
+        string_t *astr = ARG_STRING(2);
+        string_t *bstr = ARG_STRING(3);
+        truth = (strcmp(astr->data, bstr->data) != 0);
+    }
+    else
+    {
+        truth = (a.type != b.type) || (a.a.address != b.a.address);
+    }
+    call(ARG(1), boxBoolean(truth));
+}
+
 
 
 

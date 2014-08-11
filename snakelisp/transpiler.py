@@ -1,6 +1,6 @@
 from cps import Call, Lambda, Assign, Variable, Constant, Environ, null, true, false
 
-def transpile(lamb, extra_headers=(), sourcename="<noname>"):
+def transpile(lamb, extra_headers=(), sourcename="<noname>", debug=False):
     ctx  = Context()
     lambdas = collect_lambdas(set(), lamb)
     scopevars = {}
@@ -9,6 +9,8 @@ def transpile(lamb, extra_headers=(), sourcename="<noname>"):
         '/* generated from: {} */'.format(sourcename),
         '#include "snakelisp.h"',
         ""]
+    if debug:
+        lines.append("#include <stdio.h>")
     lines.extend(extra_headers)
     indent = 0 
     def dump(fmt, *args):
@@ -39,6 +41,9 @@ def transpile(lamb, extra_headers=(), sourcename="<noname>"):
         for i, arg in enumerate(func):
             func.env[arg] = "&a{}".format(i+1)
             dump("value_t a{0} = ARG({0});", i+1)
+
+        if debug:
+            dump('fprintf(stderr, ":{}\\n");', ctx.fname[func])
 
         constants = set(scrape_constants(func))
         for i, const in enumerate(constants):
@@ -83,6 +88,9 @@ def transpile(lamb, extra_headers=(), sourcename="<noname>"):
             for arg in func.body))
         indent = 0
         dump("}")
+
+    if len(lamb.upscope):
+        raise Exception("toplevel has unknown upscope variables: {}".format(lamb.upscope))
     return '\n'.join(lines) + '\n'
 
 def collect_lambdas(lambdas, obj):

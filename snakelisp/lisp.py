@@ -15,10 +15,11 @@ def main():
     mks = []
     env = Environ()
     ret = env.new_argument("cont", False)
-    var = null
-    for expr in open_list(path):
-        var = continuate(mks, expr, env)
-    program = env.close(compose(mks, Call([ret, var])))
+
+    env = env.new_environ()
+    ret = env.new_argument('cont', False)
+    exprs = open_list(path)
+    program = env.close(compile_list(exprs, env, ret))
     program = program.coalesce()
 
     c_api = {
@@ -84,120 +85,126 @@ def main():
 
     source = transpiler.transpile(program, cdefns, path)
     open(path+'.c', 'w').write(source)
-    subprocess.call(["gcc", path+'.c', "snakelisp.c", "-lm"])
-
+    subprocess.call(["gcc", path+'.c', "snakelisp.c", "-I.", "-lm"])
 
 constants = {'null': null, 'true':true, 'false':false}
-def continuate(mks, expr, env):
+
+def compile(expr, env, k):
     if ismacro2(expr, '=') and expr[0].group == 'symbol':
         var = env.get_local(expr[0].value)
-        val = continuate(mks, expr[2], env)
-        mks.append(lambda cont: Assign(var, val, cont))
-        return val
+        return compile(expr[2], env, 
+            (lambda val: Assign(var, val, retrieve(k, val))))
     if ismacro2(expr, ':=') and expr[0].group == 'symbol':
         var = env.lookup(expr[0].value)
-        val = continuate(mks, expr[2], env)
-        mks.append(lambda cont: Assign(var, val, cont))
-        return val
+        return compile(expr[2], env, 
+            (lambda val: Assign(var, val, retrieve(k, val))))
     if ismacro(expr, 'if'):
         _, cond, tru, fal = expr
-        cond = continuate(mks, cond, env)
-        a = enclose([tru], env)
-        b = enclose([fal], env)
-        return genpick(mks, cond, a, b, env)
+        return compile(cond, env,
+            (lambda truth: pick(env, k, truth,
+                enclose([tru], env),
+                enclose([fal], env))))
     if ismacro(expr, 'cond'):
-        return build_cond(mks, expr[1:], env)
+        return compile_cond(expr, env, k)
     if ismacro(expr, 'while'):
-        return build_while(mks, expr, env)
+        return compile_while(expr, env, k)
     if ismacro(expr, 'func'):
         env = env.new_environ()
         ret = env.new_argument('cont', False)
-        smks = []
         for sym in expr[1]:
             assert sym.group == 'symbol'
             env.new_argument(sym.value)
-        var = null
-        for subexpr in expr[2:]:
-            var = continuate(smks, subexpr, env)
-        return env.close(compose(smks, Call([ret, var])))
+        return retrieve(k, env.close(compile_list(expr[2:], env, ret)))
     if expr.group == 'list':
-        arglist = [continuate(mks, a, env) for a in expr]
-        callee  = arglist.pop(0)
-        retval  = Variable()
-        mks.append(lambda cont: Call([callee, Lambda([retval], cont)] + arglist))
-        return retval
+        params = []
+        seq = list(expr)
+        def next_parameter(param):
+            params.append(param)
+            if len(seq) > 0:
+                return compile(seq.pop(0), env, next_parameter)
+            else:
+                callee = params.pop(0)
+                return Call([callee, lift(k)] + params)
+        return compile(seq.pop(0), env, next_parameter)
     if expr.group == 'symbol':
         if expr.value in constants:
-            return constants[expr.value]
-        return env.lookup(expr.value)
+            param = constants[expr.value]
+        else:
+            param = env.lookup(expr.value)
+        return retrieve(k, param)
     if expr.group == 'integer':
-        return Constant(expr.value)
+        return retrieve(k, Constant(expr.value))
     if expr.group == 'double':
-        return Constant(expr.value)
+        return retrieve(k, Constant(expr.value))
     if expr.group == 'string':
-        return Constant(expr.value)
+        return retrieve(k, Constant(expr.value))
     raise Exception("what is {}?".format(expr))
 
-def build_cond(mks, exprs, env):
-    retval = Variable()
+def compile_list(exprs, env, k):
+    seq = list(exprs)
+    def next_parameter(param):
+        if len(seq) > 1:
+            return compile(seq.pop(0), env, next_parameter)
+        else:
+            return compile(seq.pop(0), env, k)
     if len(exprs) == 0:
-        mks.append(lambda cont: Call([Lambda([retval], cont), null]))
-    elif len(exprs) == 1 and ismacro(exprs[0], 'else'):
-        val = null
-        for subexpr in exprs[0][1:]:
-            val  = continuate(mks, subexpr, env)
-        mks.append(lambda cont: Call([Lambda([retval], cont), val]))
+        return retrieve(k, null)
+    return next_parameter(null)
+
+def retrieve(k, param):
+    if callable(k):
+        return k(param)
     else:
-        cond = exprs[0][0]
-        body = exprs[0][1:]
-        cond = continuate(mks, cond, env)
-        a    = enclose(body, env)
+        return Call([k, param])
 
-        cmks = []
-        cont = Variable()
-        val  = build_cond(cmks, exprs[1:], env)
-        b    = Lambda([cont], compose(cmks, Call([cont, val])))
-        return genpick(mks, cond, a, b, env)
-    return retval
+def lift(k):
+    if callable(k):
+        x = Variable()
+        return Lambda([x], k(x))
+    else:
+        return k
 
-def build_while(mks, exprs, env):
-    exit = nullfunc()
+def compile_cond(expr, env, k):
+    seq = list(expr[1:])
+    if len(seq) == 0:
+        return retrieve(k, null)
+    def next_cond(k):
+        head = seq.pop(0)
+        if len(seq) == 0 and ismacro(head, 'else'):
+            return compile_list(head[1:], env, k)
+        if len(seq) == 0:
+            raise Exception("invalid cond expression")
+        return compile(head[0], env,
+            (lambda truth: pick(env, k, truth,
+                enclose(head[1:], env),
+                lambdaCont(next_cond))))
+    return next_cond(k)
+
+def compile_while(expr, env, k):
     self = Variable()
-    cond = exprs[1]
+    seq  = expr[2:]
+    def compile_body(k):
+        return compile_list(expr[2:], env, (lambda _: Call([self, lift(k)])))
+    cont = Variable()
+    looplambda = Lambda([cont], compile(expr[1], env,
+        (lambda truth: pick(env, cont, truth, lambdaCont(compile_body), lambdaNull()))))
+    return Assign(self, looplambda, Call([self, lift(k)]), True)
 
-    cn = continuate(mks, cond, env)
-    body = exprs[2:]
-    lmks = []
-    val  = null
-    for expr in body:
-        val = continuate(lmks, expr, env)
-    cc = continuate(lmks, cond, env)
+def pick(env, k, truth, yes, no):
+    return Call([env.new_implicit('pick'), lift(k), truth, yes, no])
 
-    retval = Variable()
-    lcont  = Variable()
-    mks.append(lambda cont: Assign(
-        self,
-        Lambda([lcont], compose(lmks, Call([env.new_implicit('pick'), lcont, cc, self, exit]))),
-        Call([env.new_implicit('pick'), Lambda([retval], cont), cn, self, exit]),
-        defn=True))
-    return retval
-
-def nullfunc():
+def lambdaNull():
     cont = Variable()
     return Lambda([cont], Call([cont, null]))
 
+def lambdaCont(func):
+    cont = Variable()
+    return Lambda([cont], func(cont))
+
 def enclose(exprs, env):
     cont = Variable()
-    mks = []
-    val = null
-    for expr in exprs:
-        val = continuate(mks, expr, env)
-    return Lambda([cont], compose(mks, Call([cont, val])))
+    return Lambda([cont], compile_list(exprs, env, cont))
 
-def genpick(mks, cond, a, b, env):
-    retval = Variable()
-    mks.append(lambda cont: Call([env.new_implicit('pick'), Lambda([retval], cont), cond, a, b]))
-    return retval
 
 def ismacro(expr, name):
     return expr.group == 'list' and len(expr) > 0 and expr[0].value == name
@@ -208,11 +215,6 @@ def ismacro2(expr, name):
 def open_list(path):
     with open(path, 'r') as fd:
         return parser.parse(fd.read())
-
-def compose(mks, cont):
-    for fn in reversed(mks):
-        cont = fn(cont)
-    return cont
 
 if __name__ == '__main__':
     main()
