@@ -78,6 +78,12 @@ def main():
         "sqrt":        "&v_sqrt",
         "uncallable-hook": "&uncallable_hook",
         "type-error-hook": "&type_error_hook",
+        "interface":   "&v_get_interface",
+        "interface=":  "&v_set_interface",
+        "closure-interface": "&v_closure_interface",
+        "numeric-interface": "&v_numeric_interface",
+        "string-interface": "&v_string_interface",
+        "arraybuffer-interface": "&v_arraybuffer_interface",
     }
     c_use = set()
     for var in env.seal():

@@ -534,6 +534,51 @@ static CONTINUATION(op_sqrt)
 }
 
 value_t
+    v_get_interface,
+    v_set_interface,
+    v_closure_interface,
+    v_numeric_interface,
+    v_string_interface,
+    v_arraybuffer_interface;
+
+static CONTINUATION(get_interface)
+{
+    value_t value = ARG(2);
+    value_t interface;
+    switch (value.type)
+    {
+        case TYPE_CLOSURE:
+            interface = v_closure_interface;
+            break;
+        case TYPE_BOOLEAN:
+        case TYPE_INTEGER:
+        case TYPE_DOUBLE:
+            interface = v_numeric_interface;
+            break;
+        case TYPE_STRING:
+            interface = v_string_interface;
+            break;
+        case TYPE_ARRAYBUFFER:
+            interface = v_arraybuffer_interface;
+            break;
+        case TYPE_ARRAY:
+            interface = ARG_ARRAY(2)->interface;
+            break;
+        default:
+            assert(false);
+    }
+    call(ARG(1), interface);
+}
+
+static CONTINUATION(set_interface)
+{
+    array_t *array = ARG_ARRAY(2);
+    array->interface = ARG(3);
+    call(ARG(1), ARG(2));
+}
+
+
+value_t
     v_call_cc,
     v_pick,
     v_array,
@@ -688,6 +733,13 @@ void snakeBoot(value_t entry)
     v_exp = spawnClosure(op_exp);
     v_pow = spawnClosure(op_pow);
     v_sqrt = spawnClosure(op_sqrt);
+
+    v_get_interface = spawnClosure(get_interface);
+    v_set_interface = spawnClosure(set_interface);
+    v_closure_interface = boxNull();
+    v_numeric_interface = boxNull();
+    v_string_interface = boxNull();
+    v_arraybuffer_interface = boxNull();
 
     error_quit = spawnClosure(errorQuit);
     call(entry, spawnClosure(quit));

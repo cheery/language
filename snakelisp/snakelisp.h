@@ -40,7 +40,6 @@ extern uint8_t* gc_watermark;
     ({ value_t a = ARG(index); if(!isArray(a)) ARG_ERROR(index, "array"); unboxArray(a);})
 
 
-//remove: typedef struct argv         argv_t;
 typedef struct value        value_t;
 typedef struct object       object_t;
 typedef struct array        array_t;
@@ -72,12 +71,6 @@ struct value
 #define TYPE_STRING      4
 #define TYPE_ARRAYBUFFER 5
 #define TYPE_ARRAY       7
-
-//remove: struct argv
-//remove: {
-//remove:    size_t      length;
-//remove:    value_t     val[];
-//remove: };
 
 struct object
 {
