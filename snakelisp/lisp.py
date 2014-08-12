@@ -19,7 +19,7 @@ def main():
 
     env = env.new_environ()
     ret = env.new_argument('cont', False)
-    exprs = open_list(path)
+    exprs = list(open_list("base.sl")) + list(open_list(path))
     program = env.close(compile_list(exprs, env, ret))
     program = program.coalesce()
 
