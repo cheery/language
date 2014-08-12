@@ -4,6 +4,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <math.h>
+#include <setjmp.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 static CONTINUATION(call_cc_continue)
 {
@@ -582,23 +585,50 @@ value_t
     v_sqrt;
 
 value_t uncallable_hook;
+value_t type_error_hook;
 value_t error_quit;
+
+uint8_t* gc_high;
+uint8_t* gc_watermark;
+
+static inline size_t stackSize()
+{
+    struct rlimit rlimit;
+    getrlimit(RLIMIT_STACK, &rlimit);
+    return rlimit.rlim_cur;
+}
+
+void adjustWaterMark(uint8_t* address)
+{
+    size_t sz = stackSize();
+    size_t pad = 2*1024*1024;
+    size_t limit = sz - pad;
+    if (sz < pad*2)
+    {
+        limit = sz / 2;
+    }
+    gc_high = address;
+    gc_watermark = (address - limit);
+}
 
 static CONTINUATION(quit)
 {
-    printf("achievement: exit through the door\n");
+    uint8_t* a = frameAddress();
+    printf("used: %li, avail: %li\n", gc_high-a, a-gc_watermark);
     exit(0);
 }
 
 static CONTINUATION(errorQuit)
 {
-    printf("achievement: exit through the floor\n");
     exit(1);
 }
 
 void snakeBoot(value_t entry)
 {
+    adjustWaterMark(frameAddress());
+
     uncallable_hook = boxNull();
+    type_error_hook = boxNull();
 
     v_call_cc = spawnClosure(call_cc);
     v_pick = spawnClosure(pick);
@@ -661,4 +691,9 @@ void snakeBoot(value_t entry)
 
     error_quit = spawnClosure(errorQuit);
     call(entry, spawnClosure(quit));
+}
+
+void snakeGC(closure_t *closure, size_t argc, value_t *argv)
+{
+    assert(false);
 }

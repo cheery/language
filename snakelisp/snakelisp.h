@@ -5,13 +5,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern uint8_t* gc_watermark;
+
+// should adjust this for non-gcc compilers
+#define frameAddress() ((uint8_t*)__builtin_frame_address(0))
+
+#define checkWaterMark() \
+    if (frameAddress() < gc_watermark) \
+    { \
+        snakeGC(frame, argc, argv); \
+        return; \
+    }
+
 #define noreturn
 #define CONTINUATION(name) void name(closure_t *frame, size_t argc, value_t *argv)
 #define ARG(index) (index<argc?argv[index]:boxNull())
 #define SLOT(index) (closureSlot(frame, index))
 
 #define ARG_ERROR(index, expected) \
-    assert(false);
+    argError(frame, argc, argv, index, expected);
 #define ARG_CLOSURE(index) \
     ({ value_t a = ARG(index); if(!isClosure(a)) ARG_ERROR(index, "closure"); unboxClosure(a);})
 #define ARG_BOOLEAN(index) \
@@ -341,6 +353,7 @@ static inline string_t* unboxString(value_t value)
 #include <assert.h>
 
 extern value_t uncallable_hook;
+extern value_t type_error_hook;
 extern value_t error_quit;
 
 /*
@@ -366,6 +379,19 @@ static inline void snakeCall(size_t argc, value_t *argv)
     }
 }
 
+static inline void argError(closure_t *closure, size_t argc, value_t *argv, size_t index, const char* expected)
+{
+    if (isClosure(type_error_hook))
+    {
+        call(type_error_hook, error_quit, boxInteger(index), spawnString(expected));
+    }
+    else
+    {
+        assert(false);
+    }
+}
+
+
 /*
  * invariant: the sources alter the slots only through these functions.
  */
@@ -378,3 +404,4 @@ static inline value_t* closureSlot(closure_t *closure, size_t index)
  * invariant: we <3 puns.
  */
 void snakeBoot(value_t entry);
+void snakeGC(closure_t *closure, size_t argc, value_t *argv);

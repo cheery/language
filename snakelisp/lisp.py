@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import parser
 import transpiler
 from cps import Call, Lambda, Assign, Variable, Constant, Environ, null, true, false
@@ -76,6 +77,7 @@ def main():
         "pow":         "&v_pow",
         "sqrt":        "&v_sqrt",
         "uncallable-hook": "&uncallable_hook",
+        "type-error-hook": "&type_error_hook",
     }
     c_use = set()
     for var in env.seal():

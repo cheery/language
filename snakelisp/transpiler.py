@@ -38,12 +38,15 @@ def transpile(lamb, extra_headers=(), sourcename="<noname>", debug=False):
         dump("{")
         indent += 2
 
+        dump("checkWaterMark();")
+
         for i, arg in enumerate(func):
             func.env[arg] = "&a{}".format(i+1)
             dump("value_t a{0} = ARG({0});", i+1)
 
         if debug:
             dump('fprintf(stderr, ":{}\\n");', ctx.fname[func])
+
 
         constants = set(scrape_constants(func))
         for i, const in enumerate(constants):
