@@ -1,5 +1,0 @@
-(i = 10000)
-(while (lt 0 i)
-    (file-write stdout "whee ")
-    (i = (- i 1)))
-(file-write stdout "\n")
