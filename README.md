@@ -2,6 +2,8 @@
 
 Project Goal: Unobstructed programming experience
 
+The project is proceeding with [lisp-editor](https://github.com/cheery/lisp-editor/) and the [snakelisp](https://github.com/cheery/snakelisp/) -projects.
+
 Everything of the remaining text is planned.
 
 ## Licensing
